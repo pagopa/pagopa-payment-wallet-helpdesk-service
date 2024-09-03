@@ -23,3 +23,17 @@ go.work.sum
 
 # env file
 .env
+
+# IntelliJ
+.idea
+*.iml
+
+# VS Code
+.vscode
+
+# IntelliJ
+.idea
+*.iml
+
+# VS Code
+.vscode
