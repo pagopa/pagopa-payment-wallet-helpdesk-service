@@ -30,3 +30,10 @@ go.work.sum
 
 # VS Code
 .vscode
+
+# IntelliJ
+.idea
+*.iml
+
+# VS Code
+.vscode
