@@ -37,3 +37,6 @@ go.work.sum
 
 # VS Code
 .vscode
+
+#build
+/build/
