@@ -73,6 +73,23 @@ $ docker compose up --build
 
 ## Develop Locally 💻
 
+There is a Makefile that makes develop locally easy.
+You can build and run the application with the following commmands
+
+```shell
+$ make build
+$ make run
+```
+
+There is support for live reload also using the 
+
+```shell
+$ make run/live
+```
+command.
+
+See make help for all supported commands
+
 ### Prerequisites
 
 - git
