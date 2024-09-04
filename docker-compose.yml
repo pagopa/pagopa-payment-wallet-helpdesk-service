@@ -26,6 +26,8 @@ services:
         - "8080:8080"
     networks:
       - pagopa-payment-wallet-net
+    depends_on:
+      - pagopa-payment-wallet-mongo
 networks:
   pagopa-payment-wallet-net:
     name: pagopa-payment-wallet-net
