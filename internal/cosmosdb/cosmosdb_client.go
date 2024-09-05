@@ -17,12 +17,12 @@ func GetMongoClient() (*mongo.Client, error) {
 	uri, err := utils.ReplaceEnvPropertiesInString(MongoConnectionString)
 	if err != nil {
 		errorMessage := fmt.Sprintf("Cannot instantiate Mongo client, error building connection string: [%s]", err)
-		log.Fatal(errorMessage)
+		log.Println(errorMessage)
 		return nil, errors.New(errorMessage)
 	}
 	additionalMongoConnectionProperties := utils.GetEnvVariableOrDefault("MONGO_ADDITIONAL_CONNECTION_PROPERTIES", "")
 	mongoConnectionString := *uri + additionalMongoConnectionProperties
-	client, err := mongo.Connect(context.TODO(), options.Client().
+	client, err := mongo.Connect(context.Background(), options.Client().
 		ApplyURI(mongoConnectionString))
 	return client, err
 }
