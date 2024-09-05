@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"github.com/gin-gonic/gin"
 	"log"
-	"syscall"
 	"time"
 
+	"net/http"
+	"pagopa.it/pagopa-payment-wallet-helpdesk-service/cmd/app/api"
 	"pagopa.it/pagopa-payment-wallet-helpdesk-service/internal/cosmosdb"
 	"pagopa.it/pagopa-payment-wallet-helpdesk-service/internal/repository"
 )
@@ -22,7 +24,6 @@ func main() {
 	wallets, err := paymentWalletRepository.GetWalletsByUserID("00000000-0000-0000-0000-000000000000", ctx)
 	if err != nil {
 		log.Printf("Error searching for wallets %v", err)
-		syscall.Exit(1)
 	} else {
 		totalWallets := len(wallets)
 		for idx, wallet := range wallets {
@@ -37,6 +38,17 @@ func main() {
 				log.Printf("wallet application status: [%s]", wallet.Applications[0].Status)
 			}
 		}
-		syscall.Exit(0)
 	}
+
+	server := api.NewStrictHandler(&Server{}, []api.StrictMiddlewareFunc{})
+	r := gin.Default()
+
+	api.RegisterHandlers(r, server)
+
+	s := &http.Server{
+		Handler: r,
+		Addr:    "0.0.0.0:8080",
+	}
+
+	log.Fatal(s.ListenAndServe())
 }
