@@ -13,7 +13,12 @@ import (
 
 const MongoConnectionString = "mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_HOSTNAME}:${MONGO_PORT}/${MONGO_DB_NAME}?ssl=${MONGO_SSL_ENABLED}"
 
-func GetMongoClient(context context.Context) (*mongo.Client, error) {
+var client *mongo.Client
+
+func GetMongoClient() (*mongo.Client, error) {
+	if client != nil {
+		return client, nil
+	}
 	uri, err := utils.ReplaceEnvPropertiesInString(MongoConnectionString)
 	if err != nil {
 		errorMessage := fmt.Sprintf("error: Cannot instantiate Mongo client, error building connection string: [%s]", err)
@@ -22,7 +27,18 @@ func GetMongoClient(context context.Context) (*mongo.Client, error) {
 	}
 	additionalMongoConnectionProperties := utils.GetEnvVariableOrDefault("MONGO_ADDITIONAL_CONNECTION_PROPERTIES", "")
 	mongoConnectionString := *uri + additionalMongoConnectionProperties
-	client, err := mongo.Connect(context, options.Client().
+	mongoClient, err := mongo.Connect(context.Background(), options.Client().
 		ApplyURI(mongoConnectionString))
+	client = mongoClient
 	return client, err
+}
+
+func CloseMongoClient() {
+	if client != nil {
+		err := client.Disconnect(context.Background())
+		if err != nil {
+			log.Fatalf("Error closing mongo client: %v", err)
+		}
+		log.Println("Mongo client disconnected successfully")
+	}
 }

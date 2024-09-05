@@ -4,12 +4,22 @@ import (
 	"context"
 	"log"
 	"syscall"
+	"time"
 
-	PaymentWalletRepository "pagopa.it/pagopa-payment-wallet-helpdesk-service/internal/repository"
+	"pagopa.it/pagopa-payment-wallet-helpdesk-service/internal/cosmosdb"
+	"pagopa.it/pagopa-payment-wallet-helpdesk-service/internal/repository"
 )
 
 func main() {
-	wallets, err := PaymentWalletRepository.GetWalletsByUserID("00000000-0000-0000-0000-000000000000", context.TODO())
+	mongoClient, err := cosmosdb.GetMongoClient()
+	if err != nil {
+		log.Panicf("Error connecting to MongoDB %v", err)
+	}
+	defer cosmosdb.CloseMongoClient()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	paymentWalletRepository := repository.NewPaymentWalletRepository(mongoClient)
+	wallets, err := paymentWalletRepository.GetWalletsByUserID("00000000-0000-0000-0000-000000000000", ctx)
 	if err != nil {
 		log.Printf("Error searching for wallets %v", err)
 		syscall.Exit(1)
