@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"syscall"
 
@@ -8,7 +9,7 @@ import (
 )
 
 func main() {
-	wallets, err := PaymentWalletRepository.GetWalletsByUserID("00000000-0000-0000-0000-000000000000")
+	wallets, err := PaymentWalletRepository.GetWalletsByUserID("00000000-0000-0000-0000-000000000000", context.TODO())
 	if err != nil {
 		log.Printf("Error searching for wallets %v", err)
 		syscall.Exit(1)

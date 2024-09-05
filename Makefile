@@ -66,12 +66,11 @@ build:
 ## run: run the  application
 .PHONY: run
 run: build
-	export $(cat .env | xargs) && /tmp/bin/${binary_name}
+	/tmp/bin/${binary_name}
 
 ## run/live: run the application with reloading on file changes
 .PHONY: run/live
 run/live:
-	export $(cat .env | xargs) && \
 	go run github.com/cosmtrek/air@v1.43.0 \
 		--build.cmd "make build" --build.bin "/tmp/bin/${binary_name}" --build.delay "100" \
 		--build.exclude_dir "" \

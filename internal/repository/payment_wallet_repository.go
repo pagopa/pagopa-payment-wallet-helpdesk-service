@@ -29,7 +29,7 @@ func init() {
 	once.Do(
 		func() {
 			log.Println("Initializing Mongo client")
-			mongoClient, err = C.GetMongoClient()
+			mongoClient, err = C.GetMongoClient(context.Background())
 			if err != nil {
 				log.Fatalf("Error connecting to Mongo DB: %v", err)
 			}
@@ -44,9 +44,8 @@ func init() {
 		})
 }
 
-func GetWalletsByUserID(userID string) ([]WalletModel, error) {
+func GetWalletsByUserID(userID string, ctx context.Context) ([]WalletModel, error) {
 	var wallets []WalletModel
-	var ctx = context.TODO()
 	filter := bson.D{{Key: "userId", Value: userID}}
 	log.Printf("Finding wallets for userId: [%s]", userID)
 	cursor, err := paymentWalletCollection.Find(ctx, filter)
