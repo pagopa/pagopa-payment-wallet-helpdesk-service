@@ -80,13 +80,23 @@ You can build and run the application with the following commmands
 $ make build
 $ make run
 ```
+This application require env variables to be set
+There is support for live reload also using the be set.
+This can be done with the following command
 
-There is support for live reload also using the 
+```shell
+$ export $(cat .env | xargs)
+```
 
 ```shell
 $ make run/live
 ```
-command.
+
+or with a single command as
+
+```shell
+$ export $(cat .env | xargs) && $ make run/live
+```
 
 See make help for all supported commands
 

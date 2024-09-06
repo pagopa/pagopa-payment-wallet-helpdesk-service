@@ -1,0 +1,36 @@
+version: "3.9"
+
+services:
+  pagopa-payment-wallet-mongo:
+    container_name: pagopa-payment-wallet-mongo
+    image: mongo
+    env_file: ./docker/mongodb/mongodb.env
+    ports:
+      - "27017:27017"
+    networks:
+      - pagopa-payment-wallet-net
+    healthcheck:
+      test: echo "db.stats().ok" | mongo --quiet
+      interval: 10s
+    volumes:
+      - ./docker/mongodb/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+  pagopa-payment-wallet-helpdesk-service:
+    container_name: pagopa-payment-wallet-helpdesk-service
+    env_file: .env
+    build:
+      context: .
+      args:
+        {}
+      dockerfile: Dockerfile
+    ports:
+        - "8080:8080"
+    networks:
+      - pagopa-payment-wallet-net
+    depends_on:
+      - pagopa-payment-wallet-mongo
+networks:
+  pagopa-payment-wallet-net:
+    name: pagopa-payment-wallet-net
+    driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: 1450
