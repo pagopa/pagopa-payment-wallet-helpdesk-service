@@ -1,0 +1,70 @@
+# Deploy to Azure Kubernetes Service:
+# - DEV
+# Build and push image to Azure Container Registry; Deploy to Azure Kubernetes Service
+# https://docs.microsoft.com/azure/devops/pipelines/languages/docker
+
+parameters:
+  - name: 'DEV_DEPLOY'
+    displayName: 'DEV deployment without release'
+    type: boolean
+    default: True
+    values:
+      - False
+      - True
+resources:
+  repositories:
+    - repository: pagopaCommons
+      type: github
+      name: pagopa/azure-pipeline-templates
+      ref: refs/tags/v2.10.1
+      endpoint: 'io-azure-devops-github-ro'
+
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+  - stage: 'Build_for_DEV'
+    displayName: 'Build for DEV deployment'
+    condition: and(succeeded(), eq(${{parameters.DEV_DEPLOY}}, true))
+    jobs:
+      - job: Build_docker
+        displayName: Build docker with Build.SourceVersion as TAG
+        steps:
+          - template: templates/docker-release/template.yaml@pagopaCommons
+            parameters:
+              CONTAINER_REGISTRY_SERVICE_CONN: $(DEV_CONTAINER_REGISTRY_SERVICE_CONN)
+              CONTAINER_REGISTRY_FQDN: $(DEV_CONTAINER_NAMESPACE)
+              DOCKER_IMAGE_NAME: $(K8S_IMAGE_REPOSITORY_NAME)
+              DOCKER_IMAGE_TAG: $(Build.SourceVersion)
+              FORCE_REPLACE_DOCKER_IMAGE: ${{ parameters.FORCE_REPLACE_DOCKER_IMAGE }}
+  - stage: 'Deploy_for_DEV'
+    displayName: 'Deploy DEV'
+    dependsOn: Build_for_DEV
+    condition: and(succeeded(), eq(${{parameters.DEV_DEPLOY}}, true) )
+    jobs:
+      - deployment: "deploy"
+        environment: 'DEV'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  displayName: "Checkout"
+                - task: Bash@3
+                  name: update_chart_version
+                  displayName: 'Setup helm microservice chart'
+                  inputs:
+                    targetType: "inline"
+                    script: |
+                      helm repo add microservice-chart https://pagopa.github.io/aks-microservice-chart-blueprint
+                      helm dep build helm
+                - template: azure-templates/helm-microservice-chart-deploy.yml
+                  parameters:
+                    DO_DEPLOY: true
+                    ENV: 'DEV'
+                    KUBERNETES_SERVICE_CONN: $(DEV_KUBERNETES_SERVICE_CONN)
+                    NAMESPACE: "pay-wallet"
+                    APP_NAME: $(K8S_IMAGE_REPOSITORY_NAME)
+                    VALUE_FILE: "helm/values-dev.yaml"
+                    GREEN_VERSION: $(Build.SourceVersion)
+  

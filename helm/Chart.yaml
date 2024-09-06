@@ -1,0 +1,10 @@
+apiVersion: v2
+name: pagopa-payment-wallet-helpdesk-service
+description: Microservice that expose helpdesk API's to perform queries against user wallet statuses
+type: application
+version: 0.0.1
+appVersion: 0.0.1
+dependencies:
+  - name: microservice-chart
+    version: 7.1.1
+    repository: "https://pagopa.github.io/aks-microservice-chart-blueprint"
