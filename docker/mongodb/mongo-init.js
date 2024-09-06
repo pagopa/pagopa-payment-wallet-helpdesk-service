@@ -23,7 +23,14 @@ db.getCollection('payment-wallets').insertMany([
     "contractId": "contractId1",
     "validationOperationResult": "EXECUTED",
     "validationErrorCode": "000",
-    "applications": [],
+    "applications": [
+      {
+        "_id": "PAGOPA",
+        "status": "ENABLED",
+        "creationDate": "2099-01-01T00:00:00.000Z",
+        "updateDate": "2099-01-01T00:00:00.000Z"
+      }
+    ],
     "details": {
       "type": "CARDS",
       "bin": "12345678",
@@ -51,7 +58,14 @@ db.getCollection('payment-wallets').insertMany([
     "paymentMethodId": "148ff003-46a6-4790-9376-b0e057352e45",
     "contractId": "contractId2",
     "validationOperationResult": "EXECUTED",
-    "applications": [],
+    "applications": [
+      {
+        "_id": "PAGOPA",
+        "status": "DISABLED",
+        "creationDate": "2099-01-01T00:00:00.000Z",
+        "updateDate": "2099-01-01T00:00:00.000Z"
+      }
+    ],
     "details": {
     "maskedEmail": "b***@icbpi.it",
     "pspId": "BCITITMM",
