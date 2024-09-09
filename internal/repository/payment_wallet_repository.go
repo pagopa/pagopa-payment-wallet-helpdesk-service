@@ -21,7 +21,7 @@ type paymentWalletRepository struct {
 
 func NewPaymentWalletRepository(db *mongo.Client) *paymentWalletRepository {
 	return &paymentWalletRepository{
-		collection: db.Database(utils.GetEnvVariableOrDefault(PaymentWalletDBNameEnvKey, "wallet")).Collection(utils.GetEnvVariableOrDefault(PaymentWalletWalletsCollectionNameEnvKey, "payment-wallet")),
+		collection: db.Database(utils.GetEnvVariableOrDefault(PaymentWalletDBNameEnvKey, "wallet")).Collection(utils.GetEnvVariableOrDefault(PaymentWalletWalletsCollectionNameEnvKey, "payment-wallets")),
 	}
 }
 
