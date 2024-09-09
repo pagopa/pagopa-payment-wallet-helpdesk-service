@@ -6,32 +6,18 @@ microservice-chart:
     repository: pagopaditncoreacr.azurecr.io/pagopapaymentwallethelpdeskservice
     tag: "0.0.1"
     pullPolicy: Always
-#  livenessProbe:
-#    httpGet:
-#      path: /actuator/health/liveness
-#      port: 8080
-#    initialDelaySeconds: 120
-#    failureThreshold: 6
-#    periodSeconds: 10
-#  readinessProbe:
-#    httpGet:
-#      path: /actuator/health/readiness
-#      port: 8080
-#    initialDelaySeconds: 120
-#    failureThreshold: 6
-#    periodSeconds: 10
   livenessProbe:
-    handlerType: "exec"
-    exec:
-      command: ["/bin/sh", "-c", "ls"] #TODO replace with HTTP probe once ready
-    initialDelaySeconds: 120
+    httpGet:
+      path: /info
+      port: 8080
+    initialDelaySeconds: 10
     failureThreshold: 6
     periodSeconds: 10
   readinessProbe:
-    handlerType: "exec"
-    exec:
-      command: ["/bin/sh", "-c", "ls"] #TODO replace with HTTP probe once ready
-    initialDelaySeconds: 120
+    httpGet:
+      path: /info
+      port: 8080
+    initialDelaySeconds: 10
     failureThreshold: 6
     periodSeconds: 10
   deployment:
