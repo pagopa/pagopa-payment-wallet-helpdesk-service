@@ -5,30 +5,35 @@ import (
 	"fmt"
 	"log"
 
-	utils "pagopa.it/pagopa-payment-wallet-helpdesk-service/internal/utils"
-
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	utils "pagopa.it/pagopa-payment-wallet-helpdesk-service/cmd/utils"
 )
 
 const PaymentWalletWalletsCollectionNameEnvKey = "PAYMENT_WALLET_WALLETS_COLLECTION_NAME"
 
 const PaymentWalletDBNameEnvKey = "MONGO_DB_NAME"
 
-type paymentWalletRepository struct {
+type PaymentWalletRepository struct {
 	collection *mongo.Collection
 }
 
-func NewPaymentWalletRepository(db *mongo.Client) *paymentWalletRepository {
-	return &paymentWalletRepository{
+func NewPaymentWalletRepository(db *mongo.Client) *PaymentWalletRepository {
+	return &PaymentWalletRepository{
 		collection: db.Database(utils.GetEnvVariableOrDefault(PaymentWalletDBNameEnvKey, "wallet")).Collection(utils.GetEnvVariableOrDefault(PaymentWalletWalletsCollectionNameEnvKey, "payment-wallets")),
 	}
 }
 
-func (p *paymentWalletRepository) GetWalletsByUserID(userID string, ctx context.Context) ([]WalletModel, error) {
+func (p *PaymentWalletRepository) GetWallets(userID string, walletStatus *string, walletType *string, ctx context.Context) ([]WalletModel, error) {
 	var wallets []WalletModel
-	filter := bson.D{{Key: "userId", Value: userID}}
-	log.Printf("Finding wallets for userId: [%s]", userID)
+	filter := make(bson.D, 0)
+	filter = append(filter, bson.E{Key: "userId", Value: userID})
+	if walletStatus != nil {
+		filter = append(filter, bson.E{Key: "status", Value: *walletStatus})
+	}
+	if walletType != nil {
+		filter = append(filter, bson.E{Key: "details.type", Value: *walletType})
+	}
 	cursor, err := p.collection.Find(ctx, filter)
 	if err != nil {
 		return nil, fmt.Errorf("error performing query searching for wallets: %v", err)
@@ -37,6 +42,6 @@ func (p *paymentWalletRepository) GetWalletsByUserID(userID string, ctx context.
 	if err != nil {
 		return nil, fmt.Errorf("error while decoding retrived wallets: %v", err)
 	}
-	log.Printf("Found walles for userId: [%s] -> [%d]", userID, len(wallets))
+	log.Printf("Found walles for filter: [%v] -> [%d]", filter, len(wallets))
 	return wallets, nil
 }

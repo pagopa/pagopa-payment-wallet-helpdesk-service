@@ -3,16 +3,24 @@ package main
 import (
 	"context"
 	_ "embed"
-	. "pagopa.it/pagopa-payment-wallet-helpdesk-service/cmd/app/api"
+
+	api "pagopa.it/pagopa-payment-wallet-helpdesk-service/cmd/app/api"
+	service "pagopa.it/pagopa-payment-wallet-helpdesk-service/cmd/service"
 )
 
 //go:embed version.txt
 var version string
 
-type Server struct{}
+type Server struct {
+	paymentWalletHelpdeskService *service.PaymentWalletHelpdeskService
+}
 
-var _ StrictServerInterface = (*Server)(nil)
+var _ api.StrictServerInterface = (*Server)(nil)
 
-func (*Server) GetServiceInfo(_ context.Context, _ GetServiceInfoRequestObject) (GetServiceInfoResponseObject, error) {
-	return GetServiceInfo200JSONResponse{Version: version}, nil
+func (*Server) GetServiceInfo(_ context.Context, _ api.GetServiceInfoRequestObject) (api.GetServiceInfoResponseObject, error) {
+	return api.GetServiceInfo200JSONResponse{Version: version}, nil
+}
+
+func (s *Server) GetWallets(c context.Context, params api.GetWalletsRequestObject) (api.GetWalletsResponseObject, error) {
+	return s.paymentWalletHelpdeskService.SearchWallets(c, params)
 }
