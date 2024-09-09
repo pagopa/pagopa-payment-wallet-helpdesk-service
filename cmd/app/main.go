@@ -2,10 +2,14 @@ package main
 
 import (
 	"context"
+	"github.com/gin-gonic/gin"
+	"github.com/oapi-codegen/gin-middleware"
 	"log"
-	"syscall"
+	"path/filepath"
 	"time"
 
+	"net/http"
+	"pagopa.it/pagopa-payment-wallet-helpdesk-service/cmd/app/api"
 	"pagopa.it/pagopa-payment-wallet-helpdesk-service/internal/cosmosdb"
 	"pagopa.it/pagopa-payment-wallet-helpdesk-service/internal/repository"
 )
@@ -22,7 +26,6 @@ func main() {
 	wallets, err := paymentWalletRepository.GetWalletsByUserID("6fd46190-f4bf-4a9f-9e70-fb98f235a449", ctx)
 	if err != nil {
 		log.Printf("Error searching for wallets %v", err)
-		syscall.Exit(1)
 	} else {
 		totalWallets := len(wallets)
 		for idx, wallet := range wallets {
@@ -37,6 +40,29 @@ func main() {
 				log.Printf("wallet application status: [%s]", wallet.Applications[0].Status)
 			}
 		}
-		syscall.Exit(0)
 	}
+
+	validatorPath, err := filepath.Abs("./api-spec/api.yaml")
+	if err != nil {
+		log.Fatal("Unable to get path to api spec!")
+	}
+
+	validator, err := ginmiddleware.OapiValidatorFromYamlFile(validatorPath)
+	if err != nil {
+		log.Fatalf("Unable to get api spec: unable to read validator in path %s", validatorPath)
+	}
+
+	server := api.NewStrictHandler(&Server{}, []api.StrictMiddlewareFunc{})
+	r := gin.Default()
+
+	r.Use(validator)
+
+	api.RegisterHandlers(r, server)
+
+	s := &http.Server{
+		Handler: r,
+		Addr:    "0.0.0.0:8080",
+	}
+
+	log.Fatal(s.ListenAndServe())
 }
