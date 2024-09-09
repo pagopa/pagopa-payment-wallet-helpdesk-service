@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"github.com/gin-gonic/gin"
+	"github.com/oapi-codegen/gin-middleware"
 	"log"
+	"path/filepath"
 	"time"
 
 	"net/http"
@@ -40,8 +42,20 @@ func main() {
 		}
 	}
 
+	validatorPath, err := filepath.Abs("./api-spec/api.yaml")
+	if err != nil {
+		log.Fatal("Unable to get path to api spec!")
+	}
+
+	validator, err := ginmiddleware.OapiValidatorFromYamlFile(validatorPath)
+	if err != nil {
+		log.Fatalf("Unable to get api spec: unable to read validator in path %s", validatorPath)
+	}
+
 	server := api.NewStrictHandler(&Server{}, []api.StrictMiddlewareFunc{})
 	r := gin.Default()
+
+	r.Use(validator)
 
 	api.RegisterHandlers(r, server)
 
