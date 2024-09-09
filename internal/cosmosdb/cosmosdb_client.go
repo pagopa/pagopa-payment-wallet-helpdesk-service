@@ -11,7 +11,7 @@ import (
 	utils "pagopa.it/pagopa-payment-wallet-helpdesk-service/internal/utils"
 )
 
-const MongoConnectionString = "mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_HOSTNAME}:${MONGO_PORT}/${MONGO_DB_NAME}?ssl=${MONGO_SSL_ENABLED}"
+const MongoConnectionString = "mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_HOSTNAME}:${MONGO_PORT}/?ssl=${MONGO_SSL_ENABLED}"
 
 var client *mongo.Client
 
@@ -28,7 +28,7 @@ func GetMongoClient() (*mongo.Client, error) {
 	additionalMongoConnectionProperties := utils.GetEnvVariableOrDefault("MONGO_ADDITIONAL_CONNECTION_PROPERTIES", "")
 	mongoConnectionString := *uri + additionalMongoConnectionProperties
 	mongoClient, err := mongo.Connect(context.Background(), options.Client().
-		ApplyURI(mongoConnectionString))
+		ApplyURI(mongoConnectionString).SetDirect(true))
 	client = mongoClient
 	return client, err
 }

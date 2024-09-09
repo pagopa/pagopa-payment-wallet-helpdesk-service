@@ -20,10 +20,10 @@ func main() {
 		log.Panicf("Error connecting to MongoDB %v", err)
 	}
 	defer cosmosdb.CloseMongoClient()
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	paymentWalletRepository := repository.NewPaymentWalletRepository(mongoClient)
-	wallets, err := paymentWalletRepository.GetWalletsByUserID("00000000-0000-0000-0000-000000000000", ctx)
+	wallets, err := paymentWalletRepository.GetWalletsByUserID("6fd46190-f4bf-4a9f-9e70-fb98f235a449", ctx)
 	if err != nil {
 		log.Printf("Error searching for wallets %v", err)
 	} else {

@@ -1,0 +1,109 @@
+microservice-chart:
+  namespace: "pay-wallet"
+  nameOverride: ""
+  fullnameOverride: "pagopa-pay-wallet-helpdesk-service"
+  image:
+    repository: pagopaditncoreacr.azurecr.io/pagopapaymentwallethelpdeskservice
+    tag: "0.0.1"
+    pullPolicy: Always
+  livenessProbe:
+    httpGet:
+      path: /info
+      port: 8080
+    initialDelaySeconds: 10
+    failureThreshold: 6
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /info
+      port: 8080
+    initialDelaySeconds: 10
+    failureThreshold: 6
+    periodSeconds: 10
+  deployment:
+    create: true
+  service:
+    create: true
+    type: ClusterIP
+    ports:
+      - 8080
+  ingress:
+    create: true
+    host: "itndev.pay-wallet.internal.dev.platform.pagopa.it"
+    path: /pagopa-payment-wallet-helpdesk-service/(.*)
+    servicePort: 8080
+  serviceAccount:
+    create: false
+    annotations: { }
+    name: ""
+  podAnnotations: { }
+  podSecurityContext:
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "100m"
+    limits:
+      memory: "64Mi"
+      cpu: "100m"
+  autoscaling:
+    enable: false
+    minReplica: 1
+    maxReplica: 10
+    pollingInterval: 10 # seconds
+    cooldownPeriod: 50 # seconds
+    triggers:
+      - type: cpu
+        metadata:
+          type: Utilization # Allowed types are 'Utilization' or 'AverageValue'
+          value: "75"
+  terminationGracePeriodSeconds: 30
+  strategy:
+    type: "RollingUpdate"
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  envConfig:
+    MONGO_HOSTNAME: pagopa-d-itn-pay-wallet-cosmos-account.mongo.cosmos.azure.com
+    MONGO_USERNAME: pagopa-d-itn-pay-wallet-cosmos-account
+    MONGO_PORT: "10255"
+    MONGO_SSL_ENABLED: "true"
+    MONGO_DB_NAME: "payment-wallet"
+    PAYMENT_WALLET_WALLETS_COLLECTION_NAME: "payment-wallets"
+    MONGO_ADDITIONAL_CONNECTION_PROPERTIES: "&authMechanism=SCRAM-SHA-256&retryWrites=false&minPoolSize=0&maxPoolSize=50&maxIdleTimeMS=600000&connectTimeoutMS=2000&socketTimeoutMS=10000&serverSelectionTimeoutMS=2000&waitQueueTimeoutMS=2000&heartbeatFrequencyMS=5000"
+  envSecret:
+    MONGO_PASSWORD: mongo-wallet-password
+  keyvault:
+    name: "pagopa-d-pay-wallet-kv"
+    tenantId: "7788edaf-0346-4068-9d79-c868aed15b3d"
+  nodeSelector: { }
+  canaryDelivery:
+    deployment:
+      image:
+        tag: ""
+  tolerations:
+    - effect: "NoSchedule"
+      key: "paymentWalletOnly"
+      operator: "Equal"
+      value: "true"
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: domain
+                operator: In
+                values:
+                  - paywallet
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                aadpodidbinding: pay-wallet-pod-identity
+            namespaces: [ "pay-wallet" ]
+            topologyKey: topology.kubernetes.io/zone
