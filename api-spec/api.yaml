@@ -1,0 +1,34 @@
+openapi: 3.0.3
+info:
+  title: pagoPA payment wallet helpdesk API
+  description: pagoPA payment wallet helpdesk API
+  version: 1.0.0
+  contact:
+    name: pagoPA - Touchpoints team
+paths:
+  /info:
+    get:
+      operationId: getServiceInfo
+      description: |-
+        Get information about this service.
+        Currently returns just the version number.
+      responses:
+        '200':
+          description: New transaction successfully created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceInfo'
+components:
+  schemas:
+    ServiceInfo:
+      type: object
+      description: Service information
+      properties:
+        version:
+          type: string
+          description: The running service version
+      required:
+        - version
+      example:
+        version: "1.0.0"
