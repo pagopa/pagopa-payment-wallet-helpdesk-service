@@ -11,7 +11,7 @@ import (
 	utils "pagopa.it/pagopa-payment-wallet-helpdesk-service/internal/utils"
 )
 
-const MongoConnectionString = "mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_HOSTNAME}:${MONGO_PORT}/${MONGO_DB_NAME}?ssl=${MONGO_SSL_ENABLED}"
+const MongoConnectionString = "mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_HOSTNAME}:${MONGO_PORT}/?ssl=${MONGO_SSL_ENABLED}"
 
 var client *mongo.Client
 

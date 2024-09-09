@@ -86,6 +86,7 @@ microservice-chart:
     MONGO_PORT: "10255"
     MONGO_SSL_ENABLED: "true"
     MONGO_DB_NAME: "payment-wallet"
+    MONGO_ADDITIONAL_CONNECTION_PROPERTIES: "&retryWrites=false&minPoolSize=0&maxPoolSize=50&maxIdleTimeMS=600000&connectTimeoutMS=2000&socketTimeoutMS=10000&serverSelectionTimeoutMS=2000&waitQueueTimeoutMS=2000&heartbeatFrequencyMS=5000"
   envSecret:
     MONGO_PASSWORD: mongo-wallet-password
   keyvault:
