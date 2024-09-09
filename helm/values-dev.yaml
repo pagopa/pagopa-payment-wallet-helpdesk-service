@@ -1,5 +1,4 @@
 microservice-chart:
-  restartPolicy: "OnFailure" #TODO to be deleted!!!
   namespace: "pay-wallet"
   nameOverride: ""
   fullnameOverride: "pagopa-pay-wallet-helpdesk-service"
