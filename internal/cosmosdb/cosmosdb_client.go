@@ -28,7 +28,7 @@ func GetMongoClient() (*mongo.Client, error) {
 	additionalMongoConnectionProperties := utils.GetEnvVariableOrDefault("MONGO_ADDITIONAL_CONNECTION_PROPERTIES", "")
 	mongoConnectionString := *uri + additionalMongoConnectionProperties
 	mongoClient, err := mongo.Connect(context.Background(), options.Client().
-		ApplyURI(mongoConnectionString))
+		ApplyURI(mongoConnectionString).SetDirect(true))
 	client = mongoClient
 	return client, err
 }

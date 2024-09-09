@@ -7,7 +7,7 @@ RUN go mod download
 COPY . .
 RUN make build
 
-FROM scratch
+FROM alpine:3.20.3
 ARG EXECUTABLE_NAME="pagopa-payment-wallet-helpdesk-service"
 ARG EXECUTABLE_PATH="/tmp/bin/${EXECUTABLE_NAME}"
 COPY --from=builder ${EXECUTABLE_PATH} ./${EXECUTABLE_NAME}

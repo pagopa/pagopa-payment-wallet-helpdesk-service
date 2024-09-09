@@ -16,7 +16,7 @@ func main() {
 		log.Panicf("Error connecting to MongoDB %v", err)
 	}
 	defer cosmosdb.CloseMongoClient()
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	paymentWalletRepository := repository.NewPaymentWalletRepository(mongoClient)
 	wallets, err := paymentWalletRepository.GetWalletsByUserID("00000000-0000-0000-0000-000000000000", ctx)
