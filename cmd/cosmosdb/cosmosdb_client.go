@@ -8,7 +8,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	utils "pagopa.it/pagopa-payment-wallet-helpdesk-service/internal/utils"
+	utils "pagopa.it/pagopa-payment-wallet-helpdesk-service/cmd/utils"
 )
 
 const MongoConnectionString = "mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_HOSTNAME}:${MONGO_PORT}/?ssl=${MONGO_SSL_ENABLED}"

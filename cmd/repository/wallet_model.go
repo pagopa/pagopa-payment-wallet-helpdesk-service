@@ -1,8 +1,21 @@
 package repository
 
+var PaymentWalletDiscriminatorMap = map[string]string{
+	"CARDS":  "it.pagopa.wallet.documents.wallets.details.CardDetails",
+	"PAYPAL": "it.pagopa.wallet.documents.wallets.details.PayPalDetails",
+}
+
+var reverseLookupMap = func() map[string]string {
+	mapping := make(map[string]string)
+	for k, v := range PaymentWalletDiscriminatorMap {
+		mapping[v] = k
+	}
+	return mapping
+}
+
 // WalletDetailsModel wallet details model: only the needed fields are extracted from DB
 type WalletDetailsModel struct {
-	Type string `json:"type" bson:"type"`
+	ClassDiscriminatorField string `json:"_class" bson:"_class"`
 }
 
 // ApplicationModel application model: only the needed fields are extracted from DB
@@ -19,4 +32,8 @@ type WalletModel struct {
 	OnboardingChannel string             `json:"onboardingChannel" bson:"onboardingChannel"`
 	Details           WalletDetailsModel `json:"details" bson:"details"`
 	Applications      []ApplicationModel `json:"applications" bson:"applications"`
+}
+
+func (model *WalletDetailsModel) GetDetailType() string {
+	return reverseLookupMap()[model.ClassDiscriminatorField]
 }
