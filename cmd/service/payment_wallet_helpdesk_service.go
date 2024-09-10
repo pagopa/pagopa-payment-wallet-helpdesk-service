@@ -50,7 +50,7 @@ func (p *PaymentWalletHelpdeskService) SearchWallets(c context.Context, request 
 			Id:                wallet.ID,
 			OnboardingChannel: wallet.OnboardingChannel,
 			Status:            wallet.Status,
-			Type:              api.WalletType(wallet.Details.Type),
+			Type:              api.WalletType(wallet.Details.GetDetailType()),
 			Applications:      applications,
 		})
 	}

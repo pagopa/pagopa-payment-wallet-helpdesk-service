@@ -32,7 +32,9 @@ func (p *PaymentWalletRepository) GetWallets(userID string, walletStatus *string
 		filter = append(filter, bson.E{Key: "status", Value: *walletStatus})
 	}
 	if walletType != nil {
-		filter = append(filter, bson.E{Key: "details.type", Value: *walletType})
+		classDiscriminatorField := PaymentWalletDiscriminatorMap[*walletType]
+		log.Printf("Wallet type: [%s], mapped to discriminator class value: [%s]", *walletType, classDiscriminatorField)
+		filter = append(filter, bson.E{Key: "details._class", Value: classDiscriminatorField})
 	}
 	cursor, err := p.collection.Find(ctx, filter)
 	if err != nil {
