@@ -1,0 +1,65 @@
+{
+	"info": {
+		"_postman_id": "f402a886-54f2-41c5-be08-e482e967d24b",
+		"name": "pagoPA payment wallet helpdesk service",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "23963988"
+	},
+	"item": [
+		{
+			"name": "Get service info",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/info",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"info"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get wallets",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/helpdesk/wallets/{{x-user-id}}?type=CARDS&status=VALIDATED",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"helpdesk",
+						"wallets",
+						"{{x-user-id}}"
+					],
+					"query": [
+						{
+							"key": "type",
+							"value": "CARDS"
+						},
+						{
+							"key": "status",
+							"value": "VALIDATED"
+						},
+						{
+							"key": "",
+							"value": "",
+							"disabled": true
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
