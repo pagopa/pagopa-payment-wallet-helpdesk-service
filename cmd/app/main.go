@@ -15,11 +15,14 @@ import (
 )
 
 func main() {
-	cosmosdb, _ := DB.GetMongoClient()
+	cosmosdb, err := DB.GetMongoClient()
+	if err != nil {
+		log.Fatalf("Unable to get mongo client: %v", err)
+	}
 	defer DB.CloseMongoClient()
 	validatorPath, err := filepath.Abs("./api-spec/api.yaml")
 	if err != nil {
-		log.Fatal("Unable to get path to api spec!")
+		log.Fatalf("Unable to get path to api spec!: %v", err)
 	}
 
 	validator, err := ginmiddleware.OapiValidatorFromYamlFile(validatorPath)
