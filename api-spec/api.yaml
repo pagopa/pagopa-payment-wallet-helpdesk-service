@@ -48,6 +48,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ServiceInfo'
+        '401':
+          description: Unauthorized
+          content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProblemJson'
+        '500':
+          description: Internal Server Error
+          content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProblemJson'
   
   /helpdesk/wallets/{userId}:
     get:
@@ -242,3 +254,8 @@ components:
       maximum: 600
       exclusiveMaximum: true
       example: 200
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
