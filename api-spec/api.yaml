@@ -5,6 +5,7 @@ info:
   version: 1.0.0
   contact:
     name: pagoPA - Touchpoints team
+    url: https://www.pagopa.it/
 tags:
   - name: helpdesk
     description: Api's to be exposed to helpdesk team
@@ -19,6 +20,18 @@ tags:
 externalDocs:
   url: https://pagopa.atlassian.net/wiki/spaces/PPR/pages/749371770/NW+-+Design+di+dettaglio
   description: Design review
+security:
+  - ApiKeyAuth: [ ]
+servers:
+  - url: https://${hostname}
+    variables:
+      hostname:
+          description: The hostname of the API server
+          default: itnprod.pay-wallet.internal.platform.pagopa.it
+          enum:
+            - itndev.pay-wallet.internal.dev.platform.pagopa.it
+            - itnuat.pay-wallet.internal.uat.platform.pagopa.it
+            - itnprod.pay-wallet.internal.platform.pagopa.it
 paths:
   /info:
     get:
