@@ -41,6 +41,9 @@ paths:
       description: |-
         Get information about this service.
         Currently returns just the version number.
+      summary: |-
+        Get information about this service.
+        Currently returns just the version number.
       responses:
         '200':
           description: Service informations
@@ -104,6 +107,16 @@ paths:
                 title: Bad request
                 status: 400
                 detail: Invalid input request
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemJson'
+              example:
+                title: Unauthorized
+                status: 401
+                detail: Unauthorized request
         '404':
           description: No wallet found for input search criteria
           content:
