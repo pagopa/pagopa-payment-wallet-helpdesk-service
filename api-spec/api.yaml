@@ -51,15 +51,15 @@ paths:
         '401':
           description: Unauthorized
           content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ProblemJson'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemJson'
         '500':
           description: Internal Server Error
           content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ProblemJson'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemJson'
   
   /helpdesk/wallets/{userId}:
     get:
