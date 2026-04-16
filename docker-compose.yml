@@ -3,7 +3,7 @@ version: "3.9"
 services:
   pagopa-payment-wallet-mongo:
     container_name: pagopa-payment-wallet-mongo
-    image: mongo
+    image: mongo@sha256:9690b268c50317b2988a7f84f514a2cdcf4de6836e12c295b48f3a203731fce1
     env_file: ./docker/mongodb/mongodb.env
     ports:
       - "27017:27017"
