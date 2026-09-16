@@ -24,6 +24,7 @@ security:
   - ApiKeyAuth: [ ]
 servers:
   - url: https://${hostname}
+    x-internal: true
     variables:
       hostname:
           description: The hostname of the API server
