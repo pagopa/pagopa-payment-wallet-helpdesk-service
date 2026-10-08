@@ -1,3 +1,4 @@
+
 openapi: 3.0.3
 info:
   title: pagoPA payment wallet helpdesk API
@@ -64,7 +65,74 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProblemJson'
-  
+  /helpdesk/wallets/contractId/deactivations/dlq:
+    get:
+      operationId: getWalletContractIdDeactivationDlq
+      tags:
+        - helpdesk
+      description: Retrieve wallets associated to an user id
+      summary: Retrieve wallets associated to an user id
+      parameters:
+      - in: query
+        name: pageSize
+        required: true
+        description: Page Size
+        schema:
+         type: integer
+      - in: query
+        name: pageNumber
+        required: true
+        description: Page number
+        schema:
+         type: integer
+      responses:
+        '200':
+          description: Wallet details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WalletContractIdDlqPageResponse'
+        '400':
+          description: Formally invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemJson'
+              example:
+                title: Bad request
+                status: 400
+                detail: Invalid input request
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemJson'
+              example:
+                title: Unauthorized
+                status: 401
+                detail: Unauthorized request
+        '404':
+          description: No wallet found for input search criteria
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemJson'
+              example:
+                title: Not found
+                status: 404
+                detail: No wallet found for input search criteria
+        '500':
+          description: Internal Server Error handling command
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemJson'
+              example:
+                title: Internal Server Error
+                status: 500
+                detail: There was an error processing the request
+
   /helpdesk/wallets/{userId}:
     get:
       operationId: getWallets
@@ -151,6 +219,56 @@ components:
         - version
       example:
         version: "1.0.0"
+    
+    WalletContractIdDlqPageResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/WalletContractIdDeactivationDlqDetail'
+        hasNext:
+            type: boolean
+            description: indicates if there are more elements to be returned
+      required:
+        - results
+        - hasNext
+    WalletContractIdDeactivationDlqDetail:
+        type: object
+        properties:
+          id: 
+            type: string
+            description: wallet unique identifier
+          contractId: 
+            type: string
+            description: the contractId for which the deactivation process did not work successfully
+          deactivationErrors:
+            type: array
+            minItems: 1
+            items:
+              $ref: '#/components/schemas/WalletContractIdDeactivationError'
+        required:
+          - id
+          - contractId
+          - deactivationErrors
+    WalletContractIdDeactivationError:
+      type: object
+      description: Error occurred during wallet contractId deactivation 
+      properties:
+        errorType:
+          type: string
+          description: Error type (received KO response, communication error)
+          enum:
+          - COMMUNICATION_ERROR
+          - KO_RESPONSE_RECEIVED
+        httpErrorCode:
+          $ref: '#/components/schemas/HttpStatusCode'
+        httpErrorDescription:
+          type: string
+          description: gateway received error description
+      required:
+        - errorType
     WalletsDetails:
       type: object
       properties:
@@ -174,7 +292,7 @@ components:
           $ref: '#/components/schemas/WalletType'
         applications:
           type: array
-          minLength: 1
+          minItems: 1
           description: list of all applications for the wallet
           items:
             $ref: '#/components/schemas/WalletApplicationInfo'
