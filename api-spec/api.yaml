@@ -79,12 +79,14 @@ paths:
         description: Page Size
         schema:
          type: integer
+         minimum: 1
+         maximum: 10
       - in: query
-        name: pageNumber
-        required: true
-        description: Page number
+        name: searchSequenceToken
+        required: false
+        description: Search sequence token used as reference point for next result fetch
         schema:
-         type: integer
+         type: string
       responses:
         '200':
           description: Wallet details
@@ -228,12 +230,12 @@ components:
           minItems: 1
           items:
             $ref: '#/components/schemas/WalletContractIdDeactivationDlqDetail'
-        hasNext:
-            type: boolean
-            description: indicates if there are more elements to be returned
+        searchSequenceToken:
+            type: string
+            description: Search sequence token used as reference point for next result fetch
       required:
         - results
-        - hasNext
+        - searchSequenceToken
     WalletContractIdDeactivationDlqDetail:
         type: object
         properties:
