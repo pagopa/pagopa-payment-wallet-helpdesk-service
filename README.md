@@ -136,12 +136,28 @@ Integration tests against MongoDB and the target Azure Cosmos DB instance are
 not yet automated. Verify database connectivity and wallet queries in the target
 environment before releasing.
 
-Container smoke tests on both the original and upgraded versions return HTTP 404
-(`no matching operation was found`) for `/info`, including when using the declared
-Host header. The existing OpenAPI server validation rejects these requests before
-they reach the handler. This is unchanged by the dependency upgrade, but must be
-resolved or verified in the deployment environment before release: Helm currently
-uses `/info` for both liveness and readiness probes.
+The application removes the OpenAPI `servers` list from its in-memory validator
+specification, so documented deployment URLs do not restrict local or Kubernetes
+probe requests. The published specification is unchanged; request parameter,
+body and security validation remain enabled.
+
+After `make run`, call the local endpoint with:
+
+```shell
+curl -i http://localhost:8080/info
+```
+
+`GET /info` is public (`security: []` in the OpenAPI operation) and returns HTTP
+200 with the service version, without an `x-api-key` header. This also allows
+the Kubernetes liveness and readiness probes to reach the endpoint.
+
+Wallet endpoints retain the global `ApiKeyAuth` requirement. The application does
+not yet configure an authentication function for the validator, so wallet requests
+return HTTP 400 with a security validation error, even if an `x-api-key` header is
+supplied. Authentication must be configured before protected endpoints can be used.
+
+For wallet queries, replace the router placeholder with a real user ID, for
+example `/helpdesk/wallets/12345`, not `/helpdesk/wallets/:userId`.
 
 #### Performance testing
 

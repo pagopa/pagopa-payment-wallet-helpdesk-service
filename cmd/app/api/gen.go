@@ -392,20 +392,6 @@ func (response GetServiceInfo200JSONResponse) VisitGetServiceInfoResponse(w http
 	return err
 }
 
-type GetServiceInfo401JSONResponse ProblemJson
-
-func (response GetServiceInfo401JSONResponse) VisitGetServiceInfoResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(401)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
 type GetServiceInfo500JSONResponse ProblemJson
 
 func (response GetServiceInfo500JSONResponse) VisitGetServiceInfoResponse(w http.ResponseWriter) error {

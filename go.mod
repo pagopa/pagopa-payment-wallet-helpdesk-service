@@ -3,6 +3,7 @@ module pagopa.it/pagopa-payment-wallet-helpdesk-service
 go 1.27.3
 
 require (
+	github.com/getkin/kin-openapi v0.151.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/oapi-codegen/gin-middleware v1.1.0
 	github.com/oapi-codegen/oapi-codegen/v2 v2.8.0
@@ -18,7 +19,6 @@ require (
 	github.com/cloudwego/base64x v0.1.7 // indirect
 	github.com/dprotaso/go-yit v0.0.0-20220510233725-9ba8df137936 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.16 // indirect
-	github.com/getkin/kin-openapi v0.151.0 // indirect
 	github.com/gin-contrib/sse v1.1.2 // indirect
 	github.com/go-openapi/jsonpointer v1.0.2 // indirect
 	github.com/go-playground/locales v0.14.2 // indirect
