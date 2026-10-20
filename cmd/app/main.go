@@ -30,9 +30,9 @@ func main() {
 		log.Fatalf("Unable to get api spec: unable to read validator in path %s", validatorPath)
 	}
 	paymentWalletHelpdeskService := service.NewPaymentWalletHelpdeskService(cosmosdb)
-	server := api.NewStrictHandler(&Server{
+	server := newServerHandler(&Server{
 		paymentWalletHelpdeskService: paymentWalletHelpdeskService,
-	}, []api.StrictMiddlewareFunc{})
+	})
 	r := gin.Default()
 
 	r.Use(validator)
