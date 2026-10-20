@@ -88,7 +88,7 @@ func TestRequestValidatorAllowsPublicServiceInfo(t *testing.T) {
 	}
 }
 
-func TestRequestValidatorPreservesWalletSecurityRequirements(t *testing.T) {
+func TestRequestValidatorDelegatesWalletAuthenticationToAPIM(t *testing.T) {
 	validator, err := newRequestValidator("../../api-spec/api.yaml")
 	if err != nil {
 		t.Fatal(err)
@@ -96,14 +96,31 @@ func TestRequestValidatorPreservesWalletSecurityRequirements(t *testing.T) {
 	router := gin.New()
 	router.Use(validator)
 	router.GET("/helpdesk/wallets/:userId", func(c *gin.Context) {
-		t.Error("request without configured authentication reached handler")
-		c.Status(http.StatusOK)
+		c.Status(http.StatusNoContent)
 	})
-	recorder := httptest.NewRecorder()
-	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "http://localhost:8080/helpdesk/wallets/12345", nil))
 
-	if recorder.Code != http.StatusBadRequest || !strings.Contains(recorder.Body.String(), "SecurityRequirementsError") {
-		t.Errorf("want authentication validation error, got status %d; body = %s", recorder.Code, recorder.Body.String())
+	for _, tc := range []struct {
+		name   string
+		query  string
+		apiKey string
+		want   int
+	}{
+		{"without forwarded key", "?status=VALIDATED&type=CARDS", "", http.StatusNoContent},
+		{"with forwarded key", "?status=VALIDATED&type=CARDS", "forwarded-by-apim", http.StatusNoContent},
+		{"invalid status", "?status=INVALID", "", http.StatusBadRequest},
+		{"invalid type", "?type=INVALID", "", http.StatusBadRequest},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodGet, "http://localhost:8080/helpdesk/wallets/12345"+tc.query, nil)
+			if tc.apiKey != "" {
+				request.Header.Set("x-api-key", tc.apiKey)
+			}
+			recorder := httptest.NewRecorder()
+			router.ServeHTTP(recorder, request)
+			if recorder.Code != tc.want {
+				t.Errorf("status = %d, want %d; body = %s", recorder.Code, tc.want, recorder.Body.String())
+			}
+		})
 	}
 }
 

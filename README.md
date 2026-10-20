@@ -138,8 +138,9 @@ environment before releasing.
 
 The application removes the OpenAPI `servers` list from its in-memory validator
 specification, so documented deployment URLs do not restrict local or Kubernetes
-probe requests. The published specification is unchanged; request parameter,
-body and security validation remain enabled.
+probe requests. The published specification is unchanged; request parameter and
+body validation remain enabled. Authentication and authorization are delegated
+to Azure API Management (APIM), not enforced by the application validator.
 
 After `make run`, call the local endpoint with:
 
@@ -151,10 +152,16 @@ curl -i http://localhost:8080/info
 200 with the service version, without an `x-api-key` header. This also allows
 the Kubernetes liveness and readiness probes to reach the endpoint.
 
-Wallet endpoints retain the global `ApiKeyAuth` requirement. The application does
-not yet configure an authentication function for the validator, so wallet requests
-return HTTP 400 with a security validation error, even if an `x-api-key` header is
-supplied. Authentication must be configured before protected endpoints can be used.
+Wallet endpoints retain the global `ApiKeyAuth` requirement in the published
+OpenAPI contract for APIM and API consumers. The application validator explicitly
+uses `openapi3filter.NoopAuthenticationFunc`: it does not check API key presence
+or validity, whether or not APIM forwards the header. Schema and parameter
+validation still apply.
+
+Before deployment, verify that APIM policies enforce authentication and
+authorization and that network and ingress restrictions prevent clients from
+reaching wallet endpoints directly, bypassing APIM. Direct local access does not
+require credentials; database connectivity is still needed for wallet queries.
 
 For wallet queries, replace the router placeholder with a real user ID, for
 example `/helpdesk/wallets/12345`, not `/helpdesk/wallets/:userId`.
