@@ -13,6 +13,81 @@ db.getCollection('applications').insertMany([
   }
 ]);
 
+db.getCollection('wallet-contractId-deactivation-dlq').createIndex(
+  { timestamp: 1, _id: 1 }
+);
+db.getCollection('payment-wallets-log-events').createIndex(
+  { walletId: 1, timestamp: 1 }
+);
+
+db.getCollection('wallet-contractId-deactivation-dlq').insertMany([
+  {
+    "_id": "b57a6eb5-1bd2-4e26-af17-074dd9fb341e",
+    "timestamp": "2026-08-11T13:24:47.978419012Z"
+  },
+  {
+    "_id": "763d8963-5338-4676-b978-52e2e72d0566",
+    "timestamp": "2026-08-11T13:24:47.978419012Z"
+  },
+  {
+    "_id": "b57a6eb5-1bd2-4e26-af17-074dd9fb341f",
+    "timestamp": "2026-08-11T13:24:47.978419013Z"
+  }
+]);
+
+db.getCollection('payment-wallets-log-events').insertMany([
+  {
+    "_id": "00000000-0000-4000-8000-000000000001",
+    "walletId": "b57a6eb5-1bd2-4e26-af17-074dd9fb341e",
+    "contractId": "previous-contractId1",
+    "timestamp": "2026-08-10T13:24:47.978419012Z",
+    "errorType": "COMMUNICATION_ERROR",
+    "attemptNumber": 1,
+    "_class": "it.pagopa.wallet.audit.WalletContractIdDeactivationErrorEvent"
+  },
+  {
+    "_id": "00000000-0000-4000-8000-000000000002",
+    "walletId": "b57a6eb5-1bd2-4e26-af17-074dd9fb341e",
+    "contractId": "contractId1",
+    "timestamp": "2026-08-11T13:24:46.978419012Z",
+    "errorType": "COMMUNICATION_ERROR",
+    "httpErrorCode": 504,
+    "attemptNumber": 1,
+    "_class": "it.pagopa.wallet.audit.WalletContractIdDeactivationErrorEvent"
+  },
+  {
+    "_id": "00000000-0000-4000-8000-000000000003",
+    "walletId": "b57a6eb5-1bd2-4e26-af17-074dd9fb341e",
+    "contractId": "contractId1",
+    "timestamp": "2026-08-11T13:24:47.978419012Z",
+    "errorType": "KO_RESPONSE_RECEIVED",
+    "httpErrorCode": 500,
+    "npgErrorCode": "PG_0017",
+    "attemptNumber": 2,
+    "_class": "it.pagopa.wallet.audit.WalletContractIdDeactivationErrorEvent"
+  },
+  {
+    "_id": "00000000-0000-4000-8000-000000000004",
+    "walletId": "763d8963-5338-4676-b978-52e2e72d0566",
+    "contractId": "contractId2",
+    "timestamp": "2026-08-11T13:24:47.978419012Z",
+    "errorType": "COMMUNICATION_ERROR",
+    "attemptNumber": 1,
+    "_class": "it.pagopa.wallet.audit.WalletContractIdDeactivationErrorEvent"
+  },
+  {
+    "_id": "00000000-0000-4000-8000-000000000005",
+    "walletId": "b57a6eb5-1bd2-4e26-af17-074dd9fb341f",
+    "contractId": "contractId3",
+    "timestamp": "2026-08-11T13:24:47.978419013Z",
+    "errorType": "KO_RESPONSE_RECEIVED",
+    "httpErrorCode": 500,
+    "npgErrorCode": "PG_0017",
+    "attemptNumber": 1,
+    "_class": "it.pagopa.wallet.audit.WalletContractIdDeactivationErrorEvent"
+  }
+]);
+
 //create and populate payment-wallets collection
 db.getCollection('payment-wallets').insertMany([
   {

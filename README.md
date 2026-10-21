@@ -76,6 +76,13 @@ If you want to customize the application environment, reference this table:
 $ docker compose up --build
 ```
 
+On a fresh MongoDB data directory, `docker/mongodb/mongo-init.js` seeds the
+`wallet` database with wallets, three DLQ entries and their deactivation error
+events, including retries and an older contract. It also creates the DLQ and
+event lookup compound indexes. Use `MONGO_DB_NAME=wallet` for this sample data.
+The initialization script does not run again on an already initialized data
+directory; restarting an existing container does not update its data.
+
 ---
 
 ## Develop Locally 💻
@@ -144,6 +151,9 @@ specification, so documented deployment URLs do not restrict local or Kubernetes
 probe requests. The published specification is unchanged; request parameter and
 body validation remain enabled. Authentication and authorization are delegated
 to Azure API Management (APIM), not enforced by the application validator.
+All request validator errors use the `ProblemJson` shape (`status`, `title`,
+`detail`), including wallet parameter errors and unknown operations. This replaces
+the previous `{"error": "..."}` body for non-DLQ routes; HTTP statuses are unchanged.
 
 After `make run`, call the local endpoint with:
 
@@ -214,8 +224,11 @@ internal database errors to the client or silently skipping wallets.
 Before deployment, provision the collections and verify query support and indexes
 on the target Cosmos DB MongoDB API. The DLQ needs a compound index supporting
 `{ timestamp: 1, _id: 1 }`; individual indexes on those fields do not replace the
-compound index required by Cosmos DB for a multi-field sort. The event lookup
-should be indexed on `{ walletId: 1, _class: 1 }`. The service does not create or
+compound index required by Cosmos DB for a multi-field sort. The event collection
+has `{ walletId: 1, timestamp: 1 }` (`walletId_1_timestamp_1`) and the default
+`_id_` index. The bulk event lookup can use the `walletId` prefix; `_class` is
+an additional filter, not part of that index. Verify query performance on the
+target Cosmos DB instance. The service does not create or
 modify indexes at startup. Agree on a uniform timestamp string format with the
 producer before it starts writing records. On MongoDB, a TTL index cannot expire
 documents based on a string timestamp; verify the target Cosmos DB TTL mechanism

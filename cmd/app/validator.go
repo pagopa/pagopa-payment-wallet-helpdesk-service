@@ -21,15 +21,11 @@ func newRequestValidator(path string) (gin.HandlerFunc, error) {
 	spec.Servers = nil
 	return ginmiddleware.OapiRequestValidatorWithOptions(spec, &ginmiddleware.Options{
 		ErrorHandler: func(c *gin.Context, message string, status int) {
-			if c.Request.URL.Path == "/helpdesk/wallets/contractId/deactivations/dlq" {
-				code := int32(status)
-				title := http.StatusText(status)
-				c.AbortWithStatusJSON(status, api.ProblemJson{
-					Status: &code, Title: &title, Detail: &message,
-				})
-				return
-			}
-			c.AbortWithStatusJSON(status, gin.H{"error": message})
+			code := int32(status)
+			title := http.StatusText(status)
+			c.AbortWithStatusJSON(status, api.ProblemJson{
+				Status: &code, Title: &title, Detail: &message,
+			})
 		},
 		Options: openapi3filter.Options{
 			// APIM enforces authentication; the backend must not be publicly reachable.
