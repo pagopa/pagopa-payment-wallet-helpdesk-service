@@ -179,11 +179,13 @@ curl -i --get 'http://localhost:8080/helpdesk/wallets/contractId/deactivations/d
 ```
 
 `pageSize` is required and must be between 1 and 10. Results are ordered by DLQ
-`timestamp` and `_id` ascending. Reuse the opaque `searchSequenceToken` for the
+`timestamp` string (lexicographically) and `_id` ascending. Reuse the opaque `searchSequenceToken` for the
 next page; an empty token in the response marks the final page. The token is a
 versioned URL-safe base64 JSON cursor, not a credential or an authorization
 boundary. Invalid tokens return 400. An empty page returns 404, including a
 continuation page whose remaining entries have expired.
+Tokens preserve the exact stored timestamp, including nanoseconds. Older BSON
+Date-based tokens are not supported; restart pagination without a token.
 
 The repository fetches at most `pageSize + 1` DLQ entries to detect another page
 and queries error events for the returned wallet IDs in one bulk query (no
@@ -192,7 +194,11 @@ expiry, inserts or timestamp updates can change subsequent pages.
 
 DLQ `_id` values and event `walletId` values must be canonical lowercase UUID
 strings. The DLQ ID is the wallet ID, not an event ID. Both collections must store
-`timestamp` as BSON Date (millisecond precision), not an ISO string. Events must
+`timestamp` as an RFC3339 string, for example `2026-08-11T13:24:47.978419012Z`,
+not a BSON Date. For chronological DLQ ordering, the producer must consistently
+use UTC (`Z`) and fixed fractional-second precision. Event timestamps are parsed
+as instants for contract selection and error ordering, preserving nanoseconds.
+Events must
 use `_class = it.pagopa.wallet.audit.WalletContractIdDeactivationErrorEvent`
 and carry `contractId`, `errorType` and a 1-based `attemptNumber`.
 `httpErrorCode` and `npgErrorCode` are optional and omitted from responses when
@@ -210,8 +216,10 @@ on the target Cosmos DB MongoDB API. The DLQ needs a compound index supporting
 `{ timestamp: 1, _id: 1 }`; individual indexes on those fields do not replace the
 compound index required by Cosmos DB for a multi-field sort. The event lookup
 should be indexed on `{ walletId: 1, _class: 1 }`. The service does not create or
-modify indexes at startup. Agree on the BSON Date format with the producer before
-it starts writing records.
+modify indexes at startup. Agree on a uniform timestamp string format with the
+producer before it starts writing records. On MongoDB, a TTL index cannot expire
+documents based on a string timestamp; verify the target Cosmos DB TTL mechanism
+separately rather than assuming date-based TTL behavior.
 
 Run repository and HTTP integration tests against a disposable local MongoDB:
 
