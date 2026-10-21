@@ -15,7 +15,8 @@ import (
 var version string
 
 type Server struct {
-	paymentWalletHelpdeskService *service.PaymentWalletHelpdeskService
+	paymentWalletHelpdeskService   *service.PaymentWalletHelpdeskService
+	contractDeactivationDlqService *service.ContractDeactivationDlqService
 }
 
 var _ api.StrictServerInterface = (*Server)(nil)
@@ -39,4 +40,9 @@ func (*Server) GetServiceInfo(_ context.Context, _ api.GetServiceInfoRequestObje
 
 func (s *Server) GetWallets(c context.Context, params api.GetWalletsRequestObject) (api.GetWalletsResponseObject, error) {
 	return s.paymentWalletHelpdeskService.SearchWallets(c, params)
+}
+
+//lint:ignore ST1003 Method name must match the generated OpenAPI interface.
+func (s *Server) GetWalletContractIdDeactivationDlq(ctx context.Context, request api.GetWalletContractIdDeactivationDlqRequestObject) (api.GetWalletContractIdDeactivationDlqResponseObject, error) {
+	return s.contractDeactivationDlqService.Search(ctx, request)
 }

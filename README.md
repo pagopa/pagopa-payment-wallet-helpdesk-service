@@ -65,7 +65,9 @@ If you want to customize the application environment, reference this table:
 
 | Variable name | Description | type | default |
 |---------------|-------------|------|---------|
- |               |             |      |         | 
+| `MONGO_DB_NAME` | Database shared by wallet, DLQ and event collections; set `payment-wallet` for the target wallet database | string | `wallet` |
+| `PAYMENT_WALLET_CONTRACT_DEACTIVATION_DLQ_COLLECTION_NAME` | DLQ collection | string | `wallet-contractId-deactivation-dlq` |
+| `PAYMENT_WALLET_LOG_EVENTS_COLLECTION_NAME` | Wallet audit event collection | string | `payment-wallets-log-events` |
 
 
 ### Run docker container
@@ -132,9 +134,10 @@ creation only; it does not verify a connection or execute database queries.
 
 #### Integration testing
 
-Integration tests against MongoDB and the target Azure Cosmos DB instance are
-not yet automated. Verify database connectivity and wallet queries in the target
-environment before releasing.
+DLQ repository and HTTP integration tests can run against a local MongoDB instance
+as described below. Integration tests against the target Azure Cosmos DB instance
+are not yet automated. Verify database connectivity, indexes and wallet queries
+in the target environment before releasing.
 
 The application removes the OpenAPI `servers` list from its in-memory validator
 specification, so documented deployment URLs do not restrict local or Kubernetes
@@ -165,6 +168,61 @@ require credentials; database connectivity is still needed for wallet queries.
 
 For wallet queries, replace the router placeholder with a real user ID, for
 example `/helpdesk/wallets/12345`, not `/helpdesk/wallets/:userId`.
+
+### Contract ID deactivation DLQ search
+
+```shell
+curl -i 'http://localhost:8080/helpdesk/wallets/contractId/deactivations/dlq?pageSize=10'
+curl -i --get 'http://localhost:8080/helpdesk/wallets/contractId/deactivations/dlq' \
+  --data-urlencode 'pageSize=10' \
+  --data-urlencode 'searchSequenceToken=<token returned by the previous page>'
+```
+
+`pageSize` is required and must be between 1 and 10. Results are ordered by DLQ
+`timestamp` and `_id` ascending. Reuse the opaque `searchSequenceToken` for the
+next page; an empty token in the response marks the final page. The token is a
+versioned URL-safe base64 JSON cursor, not a credential or an authorization
+boundary. Invalid tokens return 400. An empty page returns 404, including a
+continuation page whose remaining entries have expired.
+
+The repository fetches at most `pageSize + 1` DLQ entries to detect another page
+and queries error events for the returned wallet IDs in one bulk query (no
+per-wallet queries or `$lookup`). Pagination is not a database snapshot: TTL
+expiry, inserts or timestamp updates can change subsequent pages.
+
+DLQ `_id` values and event `walletId` values must be canonical lowercase UUID
+strings. The DLQ ID is the wallet ID, not an event ID. Both collections must store
+`timestamp` as BSON Date (millisecond precision), not an ISO string. Events must
+use `_class = it.pagopa.wallet.audit.WalletContractIdDeactivationErrorEvent`
+and carry `contractId`, `errorType` and a 1-based `attemptNumber`.
+`httpErrorCode` and `npgErrorCode` are optional and omitted from responses when
+absent. The API exposes the NPG code as `npgErrorCode`, not `httpErrorDescription`.
+
+Each result contains `id`, the latest event's `contractId`, and all recorded errors
+for that contract, ordered by attempt number, timestamp and event ID. Latest
+contract selection uses timestamp, then attempt number, then event ID as a stable
+tie-breaker. DLQ entries without corresponding events, malformed event data or
+database failures return a logged 500 ProblemJson response, without exposing
+internal database errors to the client or silently skipping wallets.
+
+Before deployment, provision the collections and verify query support and indexes
+on the target Cosmos DB MongoDB API. The DLQ needs a compound index supporting
+`{ timestamp: 1, _id: 1 }`; individual indexes on those fields do not replace the
+compound index required by Cosmos DB for a multi-field sort. The event lookup
+should be indexed on `{ walletId: 1, _class: 1 }`. The service does not create or
+modify indexes at startup. Agree on the BSON Date format with the producer before
+it starts writing records.
+
+Run repository and HTTP integration tests against a disposable local MongoDB:
+
+```shell
+MONGO_INTEGRATION_URI=mongodb://localhost:27017 make test
+```
+
+The tests create uniquely named databases and drop only those databases on
+completion. Without `MONGO_INTEGRATION_URI`, MongoDB integration tests are skipped;
+the unit and validator regression tests still run. The DLQ tests do not validate
+the target Cosmos DB deployment or APIM configuration.
 
 #### Performance testing
 
