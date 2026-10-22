@@ -220,8 +220,8 @@ Each result contains `id` and, when usable events exist, the latest event's
 timestamp and event ID. Latest contract selection uses timestamp, then attempt
 number, then event ID as a stable tie-breaker. When there are no events, the
 wallet is returned with `contractId` and `deactivationErrors` omitted. If event
-data is malformed, the wallet is still returned with an empty `contractId` and
-`deactivationErrors` array so one bad entry does not block page traversal.
+data is malformed, the wallet is still returned with both detail fields omitted
+so one bad entry does not block page traversal; the malformed data is logged.
 Database failures return a logged 500 ProblemJson response without exposing
 internal database errors to the client.
 

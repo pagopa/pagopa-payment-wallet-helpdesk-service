@@ -211,18 +211,18 @@ components:
       type: object
       description: |-
         Wallet entry from the DLQ. If there are no matching events, contractId
-        and deactivationErrors are omitted. If events are malformed, they are
-        returned as an empty string and an empty array respectively.
+        and deactivationErrors are omitted. If matching event data is malformed,
+        both detail fields are also omitted.
       properties:
         id:
           type: string
           description: Wallet unique identifier
         contractId:
           type: string
-          description: Latest contract ID whose deactivation failed; omitted when no matching events exist
+          description: Latest contract ID whose deactivation failed; omitted when event details are unavailable
         deactivationErrors:
           type: array
-          description: Errors for the latest contract, or empty when matching event data is malformed
+          description: Errors for the latest contract; omitted when event details are unavailable
           items:
             $ref: '#/components/schemas/WalletContractIdDeactivationError'
       required:

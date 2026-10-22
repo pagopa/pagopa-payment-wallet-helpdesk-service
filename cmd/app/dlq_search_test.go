@@ -133,9 +133,9 @@ func TestDlqSearchHTTPIntegration(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &malformedPage); err != nil {
 		t.Fatal(err)
 	}
-	if len(malformedPage.Results) != 1 || string(malformedPage.Results[0]["contractId"]) != `""` ||
-		string(malformedPage.Results[0]["deactivationErrors"]) != `[]` {
-		t.Fatalf("malformed event details should be empty: %s", recorder.Body.String())
+	if len(malformedPage.Results) != 1 || malformedPage.Results[0]["contractId"] != nil ||
+		malformedPage.Results[0]["deactivationErrors"] != nil {
+		t.Fatalf("malformed event details should be omitted: %s", recorder.Body.String())
 	}
 	if _, err := db.Collection("events").UpdateOne(ctx, bson.M{"walletId": ids[0]}, bson.M{
 		"$set": bson.M{"errorType": "KO_RESPONSE_RECEIVED", "timestamp": "not-a-timestamp"},
@@ -150,9 +150,9 @@ func TestDlqSearchHTTPIntegration(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &malformedPage); err != nil {
 		t.Fatal(err)
 	}
-	if len(malformedPage.Results) != 1 || string(malformedPage.Results[0]["contractId"]) != `""` ||
-		string(malformedPage.Results[0]["deactivationErrors"]) != `[]` {
-		t.Fatalf("malformed timestamp details should be empty: %s", recorder.Body.String())
+	if len(malformedPage.Results) != 1 || malformedPage.Results[0]["contractId"] != nil ||
+		malformedPage.Results[0]["deactivationErrors"] != nil {
+		t.Fatalf("malformed timestamp details should be omitted: %s", recorder.Body.String())
 	}
 	if _, err := db.Collection("events").UpdateOne(ctx, bson.M{"walletId": ids[0]}, bson.M{
 		"$set": bson.M{"timestamp": at},

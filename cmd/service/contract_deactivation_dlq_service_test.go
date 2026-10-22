@@ -70,7 +70,6 @@ func TestDlqServiceMapsFailuresAndMalformedEvents(t *testing.T) {
 		mutate             func(*repo.ContractDeactivationErrorEvent)
 		want               int
 		wantOmittedDetails bool
-		wantEmptyDetails   bool
 	}{
 		{name: "empty", want: 404},
 		{name: "invalid token", err: repo.ErrInvalidDlqPagination, want: 400},
@@ -78,16 +77,16 @@ func TestDlqServiceMapsFailuresAndMalformedEvents(t *testing.T) {
 		{name: "missing events", page: repo.ContractDeactivationDlqPage{
 			Entries: []repo.ContractDeactivationDlqEntry{{ID: "wallet"}},
 		}, want: 200, wantOmittedDetails: true},
-		{name: "missing contract", mutate: func(e *repo.ContractDeactivationErrorEvent) { e.ContractID = "" }, want: 200, wantEmptyDetails: true},
-		{name: "invalid event ID", mutate: func(e *repo.ContractDeactivationErrorEvent) { e.ID = "not-a-uuid" }, want: 200, wantEmptyDetails: true},
-		{name: "malformed stored event", mutate: func(e *repo.ContractDeactivationErrorEvent) { e.Malformed = true }, want: 200, wantEmptyDetails: true},
-		{name: "invalid type", mutate: func(e *repo.ContractDeactivationErrorEvent) { e.ErrorType = "invalid" }, want: 200, wantEmptyDetails: true},
-		{name: "missing timestamp", mutate: func(e *repo.ContractDeactivationErrorEvent) { e.Timestamp = time.Time{} }, want: 200, wantEmptyDetails: true},
-		{name: "invalid attempt", mutate: func(e *repo.ContractDeactivationErrorEvent) { e.AttemptNumber = 0 }, want: 200, wantEmptyDetails: true},
+		{name: "missing contract", mutate: func(e *repo.ContractDeactivationErrorEvent) { e.ContractID = "" }, want: 200, wantOmittedDetails: true},
+		{name: "invalid event ID", mutate: func(e *repo.ContractDeactivationErrorEvent) { e.ID = "not-a-uuid" }, want: 200, wantOmittedDetails: true},
+		{name: "malformed stored event", mutate: func(e *repo.ContractDeactivationErrorEvent) { e.Malformed = true }, want: 200, wantOmittedDetails: true},
+		{name: "invalid type", mutate: func(e *repo.ContractDeactivationErrorEvent) { e.ErrorType = "invalid" }, want: 200, wantOmittedDetails: true},
+		{name: "missing timestamp", mutate: func(e *repo.ContractDeactivationErrorEvent) { e.Timestamp = time.Time{} }, want: 200, wantOmittedDetails: true},
+		{name: "invalid attempt", mutate: func(e *repo.ContractDeactivationErrorEvent) { e.AttemptNumber = 0 }, want: 200, wantOmittedDetails: true},
 		{name: "invalid HTTP code", mutate: func(e *repo.ContractDeactivationErrorEvent) {
 			code := int32(600)
 			e.HTTPErrorCode = &code
-		}, want: 200, wantEmptyDetails: true},
+		}, want: 200, wantOmittedDetails: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.mutate != nil {
@@ -124,9 +123,6 @@ func TestDlqServiceMapsFailuresAndMalformedEvents(t *testing.T) {
 				}
 				if tc.wantOmittedDetails && (body.Results[0]["contractId"] != nil || body.Results[0]["deactivationErrors"] != nil) {
 					t.Errorf("expected absent detail fields, got %s", recorder.Body.String())
-				}
-				if tc.wantEmptyDetails && (string(body.Results[0]["contractId"]) != `""` || string(body.Results[0]["deactivationErrors"]) != `[]`) {
-					t.Errorf("expected empty detail fields, got %s", recorder.Body.String())
 				}
 			} else if !strings.Contains(recorder.Body.String(), `"status":`) {
 				t.Errorf("want problem response %d, got %s", tc.want, recorder.Body.String())

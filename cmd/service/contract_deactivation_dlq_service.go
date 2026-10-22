@@ -75,10 +75,6 @@ func dlqDetail(walletID string, events []repo.ContractDeactivationErrorEvent) (a
 		id, err := uuid.Parse(event.ID)
 		if event.Malformed || err != nil || id.String() != event.ID || event.ContractID == "" || event.Timestamp.IsZero() || event.AttemptNumber < 1 ||
 			!errorType.Valid() || (event.HTTPErrorCode != nil && (*event.HTTPErrorCode < 100 || *event.HTTPErrorCode >= 600)) {
-			contractID := ""
-			deactivationErrors := []api.WalletContractIdDeactivationError{}
-			result.ContractId = &contractID
-			result.DeactivationErrors = &deactivationErrors
 			return result, fmt.Errorf("wallet %s has a malformed deactivation error event", walletID)
 		}
 		if event.Timestamp.After(latest.Timestamp) || (event.Timestamp.Equal(latest.Timestamp) &&

@@ -165,13 +165,13 @@ type WalletApplicationInfo struct {
 type WalletApplicationStatus string
 
 // WalletContractIdDeactivationDlqDetail Wallet entry from the DLQ. If there are no matching events, contractId
-// and deactivationErrors are omitted. If events are malformed, they are
-// returned as an empty string and an empty array respectively.
+// and deactivationErrors are omitted. If matching event data is malformed,
+// both detail fields are also omitted.
 type WalletContractIdDeactivationDlqDetail struct {
-	// ContractId Latest contract ID whose deactivation failed; omitted when no matching events exist
+	// ContractId Latest contract ID whose deactivation failed; omitted when event details are unavailable
 	ContractId *string `json:"contractId,omitempty"`
 
-	// DeactivationErrors Errors for the latest contract, or empty when matching event data is malformed
+	// DeactivationErrors Errors for the latest contract; omitted when event details are unavailable
 	DeactivationErrors *[]WalletContractIdDeactivationError `json:"deactivationErrors,omitempty"`
 
 	// Id Wallet unique identifier
