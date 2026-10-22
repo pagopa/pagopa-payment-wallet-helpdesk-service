@@ -60,6 +60,64 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemJson'
   
+  /helpdesk/wallets/contractId/deactivations/dlq:
+    get:
+      operationId: getWalletContractIdDeactivationDlq
+      tags:
+        - helpdesk
+      description: |-
+        Retrieve wallets with failed contract ID deactivations, ordered by DLQ
+        timestamp and wallet ID descending. Errors belong to the latest contract
+        recorded for each wallet and are ordered by attempt number and timestamp.
+      summary: Search the contract ID deactivation dead-letter queue
+      parameters:
+        - in: query
+          name: pageSize
+          required: true
+          description: Maximum number of wallets returned per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10
+        - in: query
+          name: continuationCursor
+          required: false
+          description: Opaque continuation cursor returned by the previous page
+          schema:
+            type: string
+            maxLength: 512
+      responses:
+        '200':
+          description: Wallet deactivation failures
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WalletContractIdDlqPageResponse'
+        '400':
+          description: Invalid page size or continuation cursor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemJson'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemJson'
+        '404':
+          description: No DLQ entries found for this page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemJson'
+        '500':
+          description: Database error or inconsistent DLQ event data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemJson'
+
   /helpdesk/wallets/{userId}:
     get:
       operationId: getWallets
@@ -135,6 +193,56 @@ paths:
                 detail: There was an error processing the request
 components:
   schemas:
+    WalletContractIdDlqPageResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/WalletContractIdDeactivationDlqDetail'
+        continuationCursor:
+          type: string
+          description: Opaque continuation cursor; empty string on the last page
+      required:
+        - results
+        - continuationCursor
+    WalletContractIdDeactivationDlqDetail:
+      type: object
+      description: |-
+        Wallet entry from the DLQ. If there are no matching events, contractId
+        and deactivationErrors are omitted. If matching event data is malformed,
+        both detail fields are also omitted.
+      properties:
+        id:
+          type: string
+          description: Wallet unique identifier
+        contractId:
+          type: string
+          description: Latest contract ID whose deactivation failed; omitted when event details are unavailable
+        deactivationErrors:
+          type: array
+          description: Errors for the latest contract; omitted when event details are unavailable
+          items:
+            $ref: '#/components/schemas/WalletContractIdDeactivationError'
+      required:
+        - id
+    WalletContractIdDeactivationError:
+      type: object
+      description: Error recorded during a contract ID deactivation attempt
+      properties:
+        errorType:
+          type: string
+          enum:
+            - COMMUNICATION_ERROR
+            - KO_RESPONSE_RECEIVED
+        httpErrorCode:
+          $ref: '#/components/schemas/HttpStatusCode'
+        npgErrorCode:
+          type: string
+          description: Application error code received from NPG, when available
+      required:
+        - errorType
     ServiceInfo:
       type: object
       description: Service information

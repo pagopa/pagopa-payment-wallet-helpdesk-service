@@ -30,7 +30,8 @@ func main() {
 	}
 	paymentWalletHelpdeskService := service.NewPaymentWalletHelpdeskService(cosmosdb)
 	server := newServerHandler(&Server{
-		paymentWalletHelpdeskService: paymentWalletHelpdeskService,
+		paymentWalletHelpdeskService:   paymentWalletHelpdeskService,
+		contractDeactivationDlqService: service.NewContractDeactivationDlqService(cosmosdb),
 	})
 	r := gin.Default()
 

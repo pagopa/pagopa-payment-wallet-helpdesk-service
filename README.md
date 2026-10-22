@@ -65,7 +65,9 @@ If you want to customize the application environment, reference this table:
 
 | Variable name | Description | type | default |
 |---------------|-------------|------|---------|
- |               |             |      |         | 
+| `MONGO_DB_NAME` | Database shared by wallet, DLQ and event collections; set `payment-wallet` for the target wallet database | string | `wallet` |
+| `PAYMENT_WALLET_CONTRACT_DEACTIVATION_DLQ_COLLECTION_NAME` | DLQ collection | string | `wallet-contractId-deactivation-dlq` |
+| `PAYMENT_WALLET_LOG_EVENTS_COLLECTION_NAME` | Wallet audit event collection | string | `payment-wallets-log-events` |
 
 
 ### Run docker container
@@ -73,6 +75,13 @@ If you want to customize the application environment, reference this table:
 ```shell
 $ docker compose up --build
 ```
+
+On a fresh MongoDB data directory, `docker/mongodb/mongo-init.js` seeds the
+`wallet` database with wallets, three DLQ entries and their deactivation error
+events, including retries and an older contract. It also creates the DLQ and
+event lookup compound indexes. Use `MONGO_DB_NAME=wallet` for this sample data.
+The initialization script does not run again on an already initialized data
+directory; restarting an existing container does not update its data.
 
 ---
 
@@ -132,15 +141,19 @@ creation only; it does not verify a connection or execute database queries.
 
 #### Integration testing
 
-Integration tests against MongoDB and the target Azure Cosmos DB instance are
-not yet automated. Verify database connectivity and wallet queries in the target
-environment before releasing.
+DLQ repository and HTTP integration tests can run against a local MongoDB instance
+as described below. Integration tests against the target Azure Cosmos DB instance
+are not yet automated. Verify database connectivity, indexes and wallet queries
+in the target environment before releasing.
 
 The application removes the OpenAPI `servers` list from its in-memory validator
 specification, so documented deployment URLs do not restrict local or Kubernetes
 probe requests. The published specification is unchanged; request parameter and
 body validation remain enabled. Authentication and authorization are delegated
 to Azure API Management (APIM), not enforced by the application validator.
+All request validator errors use the `ProblemJson` shape (`status`, `title`,
+`detail`), including wallet parameter errors and unknown operations. This replaces
+the previous `{"error": "..."}` body for non-DLQ routes; HTTP statuses are unchanged.
 
 After `make run`, call the local endpoint with:
 
@@ -165,6 +178,83 @@ require credentials; database connectivity is still needed for wallet queries.
 
 For wallet queries, replace the router placeholder with a real user ID, for
 example `/helpdesk/wallets/12345`, not `/helpdesk/wallets/:userId`.
+
+### Contract ID deactivation DLQ search
+
+```shell
+curl -i 'http://localhost:8080/helpdesk/wallets/contractId/deactivations/dlq?pageSize=10'
+curl -i --get 'http://localhost:8080/helpdesk/wallets/contractId/deactivations/dlq' \
+  --data-urlencode 'pageSize=10' \
+  --data-urlencode 'continuationCursor=<cursor returned by the previous page>'
+```
+
+`pageSize` is required and must be between 1 and 10. Results are ordered by DLQ
+`timestamp` string (lexicographically) and `_id` descending, so the most recent
+entries appear first. Reuse the opaque
+`continuationCursor` for the
+next page; an empty cursor in the response marks the final page. The cursor is a
+versioned URL-safe base64 JSON cursor, not a credential or an authorization
+boundary. Invalid cursors return 400. An empty page returns 404, including a
+continuation page whose remaining entries have expired.
+The cursor preserves the exact stored timestamp, including nanoseconds. Older
+BSON Date-based cursors and v2 cursors from the previous ascending order are not
+supported; restart pagination without a cursor.
+
+The repository fetches at most `pageSize + 1` DLQ entries to detect another page
+and queries error events for the returned wallet IDs in one bulk query (no
+per-wallet queries or `$lookup`). Pagination is not a database snapshot: TTL
+expiry, inserts or timestamp updates can change subsequent pages.
+
+DLQ `_id` values and event `walletId` values are matched as strings; wallet IDs
+do not need to be UUIDs. Event `_id` values must be canonical lowercase UUID
+strings for their details to be included. The DLQ ID is the wallet ID, not an
+event ID. The DLQ `timestamp` must be present as a string; non-RFC3339 strings
+are returned and used literally for sorting and pagination, so their position
+is deterministic but not necessarily chronological. For chronological DLQ
+ordering, the producer should consistently use RFC3339 UTC (`Z`) and fixed
+fractional-second precision. The compound `{ timestamp: 1, _id: 1 }` index can
+serve the reverse scan. Event timestamps must be RFC3339 strings and are
+parsed as instants for contract selection and error ordering, preserving
+nanoseconds.
+Events must
+use `_class = it.pagopa.wallet.audit.WalletContractIdDeactivationErrorEvent`
+and carry `contractId`, `errorType` and a 1-based `attemptNumber`.
+`httpErrorCode` and `npgErrorCode` are optional and omitted from responses when
+absent. The API exposes the NPG code as `npgErrorCode`, not `httpErrorDescription`.
+
+Each result contains `id` and, when usable events exist, the latest event's
+`contractId` and all recorded errors for that contract, ordered by attempt number,
+timestamp and event ID. Latest contract selection uses timestamp, then attempt
+number, then event ID as a stable tie-breaker. When there are no events, the
+wallet is returned with `contractId` and `deactivationErrors` omitted. If event
+data is malformed, the wallet is still returned with both detail fields omitted
+so one bad entry does not block page traversal; the malformed data is logged.
+Database failures return a logged 500 ProblemJson response without exposing
+internal database errors to the client.
+
+Before deployment, provision the collections and verify query support and indexes
+on the target Cosmos DB MongoDB API. The DLQ needs a compound index supporting
+`{ timestamp: 1, _id: 1 }`; individual indexes on those fields do not replace the
+compound index required by Cosmos DB for a multi-field sort. The event collection
+has `{ walletId: 1, timestamp: 1 }` (`walletId_1_timestamp_1`) and the default
+`_id_` index. The bulk event lookup can use the `walletId` prefix; `_class` is
+an additional filter, not part of that index. Verify query performance on the
+target Cosmos DB instance. The service does not create or
+modify indexes at startup. Agree on a uniform timestamp string format with the
+producer before it starts writing records. On MongoDB, a TTL index cannot expire
+documents based on a string timestamp; verify the target Cosmos DB TTL mechanism
+separately rather than assuming date-based TTL behavior.
+
+Run repository and HTTP integration tests against a disposable local MongoDB:
+
+```shell
+MONGO_INTEGRATION_URI=mongodb://localhost:27017 make test
+```
+
+The tests create uniquely named databases and drop only those databases on
+completion. Without `MONGO_INTEGRATION_URI`, MongoDB integration tests are skipped;
+the unit and validator regression tests still run. The DLQ tests do not validate
+the target Cosmos DB deployment or APIM configuration.
 
 #### Performance testing
 

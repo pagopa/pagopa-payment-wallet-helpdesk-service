@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -63,6 +64,15 @@ paths:
 			if recorder.Code != tc.want {
 				t.Errorf("status = %d, want %d; body = %s", recorder.Code, tc.want, recorder.Body.String())
 			}
+			if tc.want >= 400 {
+				var problem api.ProblemJson
+				if err := json.Unmarshal(recorder.Body.Bytes(), &problem); err != nil ||
+					problem.Status == nil || int(*problem.Status) != tc.want ||
+					problem.Title == nil || *problem.Title != http.StatusText(tc.want) ||
+					problem.Detail == nil || *problem.Detail == "" {
+					t.Errorf("want ProblemJson response, got %s", recorder.Body.String())
+				}
+			}
 		})
 	}
 }
@@ -119,6 +129,14 @@ func TestRequestValidatorDelegatesWalletAuthenticationToAPIM(t *testing.T) {
 			router.ServeHTTP(recorder, request)
 			if recorder.Code != tc.want {
 				t.Errorf("status = %d, want %d; body = %s", recorder.Code, tc.want, recorder.Body.String())
+			}
+			if tc.want == http.StatusBadRequest {
+				var problem api.ProblemJson
+				if err := json.Unmarshal(recorder.Body.Bytes(), &problem); err != nil ||
+					problem.Status == nil || *problem.Status != 400 ||
+					problem.Detail == nil || *problem.Detail == "" {
+					t.Errorf("want wallet validation ProblemJson response, got %s", recorder.Body.String())
+				}
 			}
 		})
 	}
