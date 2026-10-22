@@ -20,6 +20,23 @@ func NewPaymentWalletHelpdeskService(db *mongo.Client) *PaymentWalletHelpdeskSer
 	}
 }
 
+func (p *PaymentWalletHelpdeskService) ResetDeactivationRetryCount(ctx context.Context, request api.ResetWalletDeactivationRetryCountRequestObject) (api.ResetWalletDeactivationRetryCountResponseObject, error) {
+	found, err := p.paymentWalletRepository.ResetDeactivationRetryCount(ctx, request.WalletId.String())
+	if err != nil {
+		log.Printf("Error resetting wallet deactivation retry count: %v", err)
+		return api.ResetWalletDeactivationRetryCount500JSONResponse(resetCounterProblem(500, "Unable to reset wallet deactivation retry count")), nil
+	}
+	if !found {
+		return api.ResetWalletDeactivationRetryCount404JSONResponse(resetCounterProblem(404, "Wallet not found")), nil
+	}
+	return api.ResetWalletDeactivationRetryCount204Response{}, nil
+}
+
+func resetCounterProblem(status int32, detail string) api.ProblemJson {
+	title := "Wallet deactivation retry counter reset"
+	return api.ProblemJson{Status: &status, Title: &title, Detail: &detail}
+}
+
 func (p *PaymentWalletHelpdeskService) SearchWallets(c context.Context, request api.GetWalletsRequestObject) (api.GetWalletsResponseObject, error) {
 	userID := request.UserId
 	walletStatus := request.Params.Status

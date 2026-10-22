@@ -26,6 +26,29 @@
 			"response": []
 		},
 		{
+			"name": "Reset wallet deactivation retry counter",
+			"request": {
+				"method": "PATCH",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/helpdesk/wallets/{{wallet-id}}/deactivationRetryCount",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"helpdesk",
+						"wallets",
+						"{{wallet-id}}",
+						"deactivationRetryCount"
+					]
+				},
+				"description": "Set deactivationRetryCount to zero on an existing wallet. Use a canonical lowercase UUID for wallet-id. No body is required. Success returns 204, including when the counter is already zero."
+			},
+			"response": []
+		},
+		{
 			"name": "Get wallets",
 			"request": {
 				"method": "GET",
