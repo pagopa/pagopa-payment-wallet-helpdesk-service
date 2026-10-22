@@ -83,6 +83,41 @@
 				}
 			},
 			"response": []
+		},
+		{
+			"name": "Search contract deactivation DLQ",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/helpdesk/wallets/contractId/deactivations/dlq?pageSize=10",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"helpdesk",
+						"wallets",
+						"contractId",
+						"deactivations",
+						"dlq"
+					],
+					"query": [
+						{
+							"key": "pageSize",
+							"value": "10"
+						},
+						{
+							"key": "continuationCursor",
+							"value": "{{continuationCursor}}",
+							"disabled": true
+						}
+					]
+				},
+				"description": "Use the continuationCursor returned by the previous page to fetch the next page."
+			},
+			"response": []
 		}
 	]
 }
