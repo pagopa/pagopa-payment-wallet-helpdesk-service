@@ -35,18 +35,30 @@ func TestDlqDocumentsRequireISOTimestampString(t *testing.T) {
 		{"null", nil, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			data, err := bson.Marshal(bson.M{"timestamp": tc.timestamp})
+			data, err := bson.Marshal(bson.M{
+				"_id":           "00000000-0000-4000-8000-000000000001",
+				"walletId":      "00000000-0000-4000-8000-000000000001",
+				"timestamp":     tc.timestamp,
+				"contractId":    "contract",
+				"errorType":     "COMMUNICATION_ERROR",
+				"attemptNumber": 1,
+			})
 			if err != nil {
 				t.Fatal(err)
 			}
-			for _, target := range []interface{}{&ContractDeactivationDlqEntry{}, &ContractDeactivationErrorEvent{}} {
-				err := bson.Unmarshal(data, target)
-				if (err != nil) != tc.wantError {
-					t.Errorf("%T: want error %v, got %v", target, tc.wantError, err)
-				}
-				if event, ok := target.(*ContractDeactivationErrorEvent); ok && !tc.wantError && !event.Timestamp.Equal(at) {
-					t.Errorf("event timestamp lost precision or offset: %s", event.Timestamp)
-				}
+			var entry ContractDeactivationDlqEntry
+			if err := bson.Unmarshal(data, &entry); (err != nil) != tc.wantError {
+				t.Errorf("DLQ entry: want error %v, got %v", tc.wantError, err)
+			}
+			var event ContractDeactivationErrorEvent
+			if err := bson.Unmarshal(data, &event); err != nil {
+				t.Fatalf("event decoding must preserve malformed rows for per-wallet handling: %v", err)
+			}
+			if event.Malformed != tc.wantError {
+				t.Errorf("event malformed = %v, want %v", event.Malformed, tc.wantError)
+			}
+			if !tc.wantError && !event.Timestamp.Equal(at) {
+				t.Errorf("event timestamp lost precision or offset: %s", event.Timestamp)
 			}
 		})
 	}
@@ -196,8 +208,15 @@ func TestDlqRepositoryIntegration(t *testing.T) {
 	if _, err := db.Collection("custom-events").UpdateByID(ctx, ids[1], bson.M{"$set": bson.M{"timestamp": "invalid"}}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := repository.Search(ctx, 10, ""); err == nil {
-		t.Fatal("expected malformed event timestamp to fail")
+	page, err = repository.Search(ctx, 10, "")
+	malformedEventFound := false
+	for _, event := range page.Events {
+		if event.WalletID == ids[1] && event.Malformed {
+			malformedEventFound = true
+		}
+	}
+	if err != nil || !malformedEventFound {
+		t.Fatalf("malformed event timestamp should remain available for per-wallet handling: %+v, %v", page.Events, err)
 	}
 	if _, err := db.Collection("custom-events").UpdateByID(ctx, ids[1], bson.M{"$set": bson.M{"timestamp": at}}); err != nil {
 		t.Fatal(err)
@@ -205,7 +224,29 @@ func TestDlqRepositoryIntegration(t *testing.T) {
 	if _, err := db.Collection("custom-events").UpdateByID(ctx, ids[1], bson.M{"$set": bson.M{"httpErrorCode": "invalid"}}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := repository.Search(ctx, 10, ""); err == nil {
-		t.Fatal("expected malformed event to fail decoding")
+	page, err = repository.Search(ctx, 10, "")
+	malformedEventFound = false
+	for _, event := range page.Events {
+		if event.WalletID == ids[1] && event.Malformed {
+			malformedEventFound = true
+		}
+	}
+	if err != nil || !malformedEventFound {
+		t.Fatalf("malformed event should remain associated with its wallet: %+v, %v", page.Events, err)
+	}
+	if _, err := db.Collection("custom-events").UpdateByID(ctx, ids[1], bson.M{
+		"$set": bson.M{"httpErrorCode": 500, "timestamp": "invalid"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	page, err = repository.Search(ctx, 10, "")
+	malformedEventFound = false
+	for _, event := range page.Events {
+		if event.WalletID == ids[1] && event.Malformed {
+			malformedEventFound = true
+		}
+	}
+	if err != nil || !malformedEventFound {
+		t.Fatalf("malformed event timestamp should not fail page decoding: %+v, %v", page.Events, err)
 	}
 }

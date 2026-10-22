@@ -80,9 +80,9 @@ paths:
             minimum: 1
             maximum: 10
         - in: query
-          name: searchSequenceToken
+          name: continuationCursor
           required: false
-          description: Opaque continuation token returned by the previous page
+          description: Opaque continuation cursor returned by the previous page
           schema:
             type: string
             maxLength: 512
@@ -94,7 +94,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/WalletContractIdDlqPageResponse'
         '400':
-          description: Invalid page size or continuation token
+          description: Invalid page size or continuation cursor
           content:
             application/json:
               schema:
@@ -201,30 +201,32 @@ components:
           minItems: 1
           items:
             $ref: '#/components/schemas/WalletContractIdDeactivationDlqDetail'
-        searchSequenceToken:
+        continuationCursor:
           type: string
-          description: Opaque continuation token; empty string on the last page
+          description: Opaque continuation cursor; empty string on the last page
       required:
         - results
-        - searchSequenceToken
+        - continuationCursor
     WalletContractIdDeactivationDlqDetail:
       type: object
+      description: |-
+        Wallet entry from the DLQ. If there are no matching events, contractId
+        and deactivationErrors are omitted. If events are malformed, they are
+        returned as an empty string and an empty array respectively.
       properties:
         id:
           type: string
           description: Wallet unique identifier
         contractId:
           type: string
-          description: Latest contract ID whose deactivation failed
+          description: Latest contract ID whose deactivation failed; omitted when no matching events exist
         deactivationErrors:
           type: array
-          minItems: 1
+          description: Errors for the latest contract, or empty when matching event data is malformed
           items:
             $ref: '#/components/schemas/WalletContractIdDeactivationError'
       required:
         - id
-        - contractId
-        - deactivationErrors
     WalletContractIdDeactivationError:
       type: object
       description: Error recorded during a contract ID deactivation attempt

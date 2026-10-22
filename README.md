@@ -185,17 +185,18 @@ example `/helpdesk/wallets/12345`, not `/helpdesk/wallets/:userId`.
 curl -i 'http://localhost:8080/helpdesk/wallets/contractId/deactivations/dlq?pageSize=10'
 curl -i --get 'http://localhost:8080/helpdesk/wallets/contractId/deactivations/dlq' \
   --data-urlencode 'pageSize=10' \
-  --data-urlencode 'searchSequenceToken=<token returned by the previous page>'
+  --data-urlencode 'continuationCursor=<cursor returned by the previous page>'
 ```
 
 `pageSize` is required and must be between 1 and 10. Results are ordered by DLQ
-`timestamp` string (lexicographically) and `_id` ascending. Reuse the opaque `searchSequenceToken` for the
-next page; an empty token in the response marks the final page. The token is a
+`timestamp` string (lexicographically) and `_id` ascending. Reuse the opaque
+`continuationCursor` for the
+next page; an empty cursor in the response marks the final page. The cursor is a
 versioned URL-safe base64 JSON cursor, not a credential or an authorization
-boundary. Invalid tokens return 400. An empty page returns 404, including a
+boundary. Invalid cursors return 400. An empty page returns 404, including a
 continuation page whose remaining entries have expired.
-Tokens preserve the exact stored timestamp, including nanoseconds. Older BSON
-Date-based tokens are not supported; restart pagination without a token.
+The cursor preserves the exact stored timestamp, including nanoseconds. Older BSON
+Date-based cursors are not supported; restart pagination without a cursor.
 
 The repository fetches at most `pageSize + 1` DLQ entries to detect another page
 and queries error events for the returned wallet IDs in one bulk query (no
@@ -214,12 +215,15 @@ and carry `contractId`, `errorType` and a 1-based `attemptNumber`.
 `httpErrorCode` and `npgErrorCode` are optional and omitted from responses when
 absent. The API exposes the NPG code as `npgErrorCode`, not `httpErrorDescription`.
 
-Each result contains `id`, the latest event's `contractId`, and all recorded errors
-for that contract, ordered by attempt number, timestamp and event ID. Latest
-contract selection uses timestamp, then attempt number, then event ID as a stable
-tie-breaker. DLQ entries without corresponding events, malformed event data or
-database failures return a logged 500 ProblemJson response, without exposing
-internal database errors to the client or silently skipping wallets.
+Each result contains `id` and, when usable events exist, the latest event's
+`contractId` and all recorded errors for that contract, ordered by attempt number,
+timestamp and event ID. Latest contract selection uses timestamp, then attempt
+number, then event ID as a stable tie-breaker. When there are no events, the
+wallet is returned with `contractId` and `deactivationErrors` omitted. If event
+data is malformed, the wallet is still returned with an empty `contractId` and
+`deactivationErrors` array so one bad entry does not block page traversal.
+Database failures return a logged 500 ProblemJson response without exposing
+internal database errors to the client.
 
 Before deployment, provision the collections and verify query support and indexes
 on the target Cosmos DB MongoDB API. The DLQ needs a compound index supporting

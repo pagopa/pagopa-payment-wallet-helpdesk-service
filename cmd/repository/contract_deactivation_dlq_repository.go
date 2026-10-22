@@ -40,6 +40,7 @@ type ContractDeactivationErrorEvent struct {
 	HTTPErrorCode *int32    `bson:"httpErrorCode"`
 	NPGErrorCode  *string   `bson:"npgErrorCode"`
 	AttemptNumber int       `bson:"attemptNumber"`
+	Malformed     bool      `bson:"-"`
 }
 
 func (entry *ContractDeactivationDlqEntry) UnmarshalBSON(data []byte) error {
@@ -49,18 +50,41 @@ func (entry *ContractDeactivationDlqEntry) UnmarshalBSON(data []byte) error {
 
 func (event *ContractDeactivationErrorEvent) UnmarshalBSON(data []byte) error {
 	type document ContractDeactivationErrorEvent
-	return decodeDlqTimestampDocument(data, (*document)(event))
+	walletID, ok := bson.Raw(data).Lookup("walletId").StringValueOK()
+	event.WalletID = walletID
+	if !ok {
+		event.Malformed = true
+		return nil
+	}
+	if err := validateDlqTimestamp(data); err != nil {
+		event.Malformed = true
+		return nil
+	}
+	var decoded document
+	if err := bson.Unmarshal(data, &decoded); err != nil {
+		event.Malformed = true
+		return nil
+	}
+	*event = ContractDeactivationErrorEvent(decoded)
+	return nil
 }
 
 func decodeDlqTimestampDocument(data []byte, target interface{}) error {
+	if err := validateDlqTimestamp(data); err != nil {
+		return err
+	}
+	return bson.Unmarshal(data, target)
+}
+
+func validateDlqTimestamp(data []byte) error {
 	timestamp, ok := bson.Raw(data).Lookup("timestamp").StringValueOK()
 	if !ok {
 		return errors.New("contract deactivation timestamp must be an RFC3339 string")
 	}
 	if _, err := time.Parse(time.RFC3339Nano, timestamp); err != nil {
-		return fmt.Errorf("invalid contract deactivation timestamp: %w", err)
+		return fmt.Errorf("invalid RFC3339 timestamp: %w", err)
 	}
-	return bson.Unmarshal(data, target)
+	return nil
 }
 
 type ContractDeactivationDlqPage struct {

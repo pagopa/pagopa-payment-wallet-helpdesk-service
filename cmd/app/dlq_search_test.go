@@ -62,7 +62,7 @@ func TestDlqSearchHTTPIntegration(t *testing.T) {
 	const path = "/helpdesk/wallets/contractId/deactivations/dlq"
 	for _, query := range []string{
 		"", "?pageSize=0", "?pageSize=11", "?pageSize=abc",
-		"?pageSize=1&searchSequenceToken=invalid",
+		"?pageSize=1&continuationCursor=invalid",
 	} {
 		recorder := httptest.NewRecorder()
 		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path+query, nil))
@@ -97,7 +97,7 @@ func TestDlqSearchHTTPIntegration(t *testing.T) {
 	for i, id := range ids {
 		recorder := httptest.NewRecorder()
 		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet,
-			path+"?pageSize=1&searchSequenceToken="+url.QueryEscape(token), nil))
+			path+"?pageSize=1&continuationCursor="+url.QueryEscape(token), nil))
 		if recorder.Code != http.StatusOK {
 			t.Fatalf("page %d: want 200, got %d: %s", i, recorder.Code, recorder.Body.String())
 		}
@@ -105,28 +105,76 @@ func TestDlqSearchHTTPIntegration(t *testing.T) {
 		if err := json.Unmarshal(recorder.Body.Bytes(), &page); err != nil {
 			t.Fatal(err)
 		}
-		if len(page.Results) != 1 || page.Results[0].Id != id || page.Results[0].ContractId != "contract" {
+		if len(page.Results) != 1 || page.Results[0].Id != id || page.Results[0].ContractId == nil || *page.Results[0].ContractId != "contract" {
 			t.Fatalf("unexpected page: %+v", page)
 		}
 		errors := page.Results[0].DeactivationErrors
-		if len(errors) != 1 || errors[0].NpgErrorCode == nil || *errors[0].NpgErrorCode != "PG_0017" {
+		if errors == nil || len(*errors) != 1 || (*errors)[0].NpgErrorCode == nil || *(*errors)[0].NpgErrorCode != "PG_0017" {
 			t.Fatalf("missing NPG error details: %+v", errors)
 		}
-		if (i == 0 && page.SearchSequenceToken == "") || (i == 1 && page.SearchSequenceToken != "") {
-			t.Fatalf("unexpected continuation token on page %d: %q", i, page.SearchSequenceToken)
+		if (i == 0 && page.ContinuationCursor == "") || (i == 1 && page.ContinuationCursor != "") {
+			t.Fatalf("unexpected continuation cursor on page %d: %q", i, page.ContinuationCursor)
 		}
-		token = page.SearchSequenceToken
+		token = page.ContinuationCursor
+	}
+	if _, err := db.Collection("events").UpdateOne(ctx, bson.M{"walletId": ids[0]}, bson.M{
+		"$set": bson.M{"errorType": "UNRECOGNIZED_ERROR"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	recorder = httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path+"?pageSize=1", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("malformed event: want 200, got %d: %s", recorder.Code, recorder.Body.String())
+	}
+	var malformedPage struct {
+		Results []map[string]json.RawMessage `json:"results"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &malformedPage); err != nil {
+		t.Fatal(err)
+	}
+	if len(malformedPage.Results) != 1 || string(malformedPage.Results[0]["contractId"]) != `""` ||
+		string(malformedPage.Results[0]["deactivationErrors"]) != `[]` {
+		t.Fatalf("malformed event details should be empty: %s", recorder.Body.String())
+	}
+	if _, err := db.Collection("events").UpdateOne(ctx, bson.M{"walletId": ids[0]}, bson.M{
+		"$set": bson.M{"errorType": "KO_RESPONSE_RECEIVED", "timestamp": "not-a-timestamp"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	recorder = httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path+"?pageSize=1", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("malformed event timestamp: want 200, got %d: %s", recorder.Code, recorder.Body.String())
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &malformedPage); err != nil {
+		t.Fatal(err)
+	}
+	if len(malformedPage.Results) != 1 || string(malformedPage.Results[0]["contractId"]) != `""` ||
+		string(malformedPage.Results[0]["deactivationErrors"]) != `[]` {
+		t.Fatalf("malformed timestamp details should be empty: %s", recorder.Body.String())
+	}
+	if _, err := db.Collection("events").UpdateOne(ctx, bson.M{"walletId": ids[0]}, bson.M{
+		"$set": bson.M{"timestamp": at},
+	}); err != nil {
+		t.Fatal(err)
 	}
 	if _, err := db.Collection("events").DeleteMany(ctx, bson.M{}); err != nil {
 		t.Fatal(err)
 	}
 	recorder = httptest.NewRecorder()
 	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path+"?pageSize=1", nil))
-	if recorder.Code != http.StatusInternalServerError {
-		t.Fatalf("missing events: want 500, got %d: %s", recorder.Code, recorder.Body.String())
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("missing events: want 200, got %d: %s", recorder.Code, recorder.Body.String())
 	}
-	var problem api.ProblemJson
-	if err := json.Unmarshal(recorder.Body.Bytes(), &problem); err != nil || problem.Status == nil || *problem.Status != 500 {
-		t.Fatalf("want typed 500 problem, got %s", recorder.Body.String())
+	var noEventsPage struct {
+		Results []map[string]json.RawMessage `json:"results"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &noEventsPage); err != nil {
+		t.Fatal(err)
+	}
+	if len(noEventsPage.Results) != 1 || noEventsPage.Results[0]["contractId"] != nil ||
+		noEventsPage.Results[0]["deactivationErrors"] != nil {
+		t.Fatalf("missing events should omit optional details: %s", recorder.Body.String())
 	}
 }

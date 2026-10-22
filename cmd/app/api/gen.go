@@ -164,11 +164,15 @@ type WalletApplicationInfo struct {
 // WalletApplicationStatus Enumeration of wallet statuses
 type WalletApplicationStatus string
 
-// WalletContractIdDeactivationDlqDetail defines model for WalletContractIdDeactivationDlqDetail.
+// WalletContractIdDeactivationDlqDetail Wallet entry from the DLQ. If there are no matching events, contractId
+// and deactivationErrors are omitted. If events are malformed, they are
+// returned as an empty string and an empty array respectively.
 type WalletContractIdDeactivationDlqDetail struct {
-	// ContractId Latest contract ID whose deactivation failed
-	ContractId         string                              `json:"contractId"`
-	DeactivationErrors []WalletContractIdDeactivationError `json:"deactivationErrors"`
+	// ContractId Latest contract ID whose deactivation failed; omitted when no matching events exist
+	ContractId *string `json:"contractId,omitempty"`
+
+	// DeactivationErrors Errors for the latest contract, or empty when matching event data is malformed
+	DeactivationErrors *[]WalletContractIdDeactivationError `json:"deactivationErrors,omitempty"`
 
 	// Id Wallet unique identifier
 	Id string `json:"id"`
@@ -193,10 +197,9 @@ type WalletContractIdDeactivationErrorErrorType string
 
 // WalletContractIdDlqPageResponse defines model for WalletContractIdDlqPageResponse.
 type WalletContractIdDlqPageResponse struct {
-	Results []WalletContractIdDeactivationDlqDetail `json:"results"`
-
-	// SearchSequenceToken Opaque continuation token; empty string on the last page
-	SearchSequenceToken string `json:"searchSequenceToken"`
+	// ContinuationCursor Opaque continuation cursor; empty string on the last page
+	ContinuationCursor string                                  `json:"continuationCursor"`
+	Results            []WalletContractIdDeactivationDlqDetail `json:"results"`
 }
 
 // WalletDetail defines model for WalletDetail.
@@ -233,8 +236,8 @@ type GetWalletContractIdDeactivationDlqParams struct {
 	// PageSize Maximum number of wallets returned per page
 	PageSize int `form:"pageSize" json:"pageSize"`
 
-	// SearchSequenceToken Opaque continuation token returned by the previous page
-	SearchSequenceToken *string `form:"searchSequenceToken,omitempty" json:"searchSequenceToken,omitempty"`
+	// ContinuationCursor Opaque continuation cursor returned by the previous page
+	ContinuationCursor *string `form:"continuationCursor,omitempty" json:"continuationCursor,omitempty"`
 }
 
 // GetWalletsParams defines parameters for GetWallets.
@@ -286,11 +289,11 @@ func (siw *ServerInterfaceWrapper) GetWalletContractIdDeactivationDlq(c *gin.Con
 		return
 	}
 
-	// ------------- Optional query parameter "searchSequenceToken" -------------
+	// ------------- Optional query parameter "continuationCursor" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "searchSequenceToken", c.Request.URL.Query(), &params.SearchSequenceToken, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "continuationCursor", c.Request.URL.Query(), &params.ContinuationCursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
 	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter searchSequenceToken: %w", err), http.StatusBadRequest)
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter continuationCursor: %w", err), http.StatusBadRequest)
 		return
 	}
 

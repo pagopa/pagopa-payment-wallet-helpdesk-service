@@ -27,13 +27,13 @@ func NewContractDeactivationDlqService(client *mongo.Client) *ContractDeactivati
 }
 
 func (s *ContractDeactivationDlqService) Search(ctx context.Context, request api.GetWalletContractIdDeactivationDlqRequestObject) (api.GetWalletContractIdDeactivationDlqResponseObject, error) {
-	token := ""
-	if request.Params.SearchSequenceToken != nil {
-		token = *request.Params.SearchSequenceToken
+	cursor := ""
+	if request.Params.ContinuationCursor != nil {
+		cursor = *request.Params.ContinuationCursor
 	}
-	page, err := s.repository.Search(ctx, request.Params.PageSize, token)
+	page, err := s.repository.Search(ctx, request.Params.PageSize, cursor)
 	if errors.Is(err, repo.ErrInvalidDlqPagination) {
-		return api.GetWalletContractIdDeactivationDlq400JSONResponse(dlqProblem(400, "Invalid page size or continuation token")), nil
+		return api.GetWalletContractIdDeactivationDlq400JSONResponse(dlqProblem(400, "Invalid page size or continuation cursor")), nil
 	}
 	if err != nil {
 		log.Printf("Error searching contract deactivation DLQ: %v", err)
@@ -50,13 +50,12 @@ func (s *ContractDeactivationDlqService) Search(ctx context.Context, request api
 	for _, entry := range page.Entries {
 		detail, err := dlqDetail(entry.ID, eventsByWallet[entry.ID])
 		if err != nil {
-			log.Printf("Inconsistent contract deactivation DLQ data: %v", err)
-			return api.GetWalletContractIdDeactivationDlq500JSONResponse(dlqProblem(500, "Inconsistent contract deactivation failure data")), nil
+			log.Printf("Malformed contract deactivation DLQ data: %v", err)
 		}
 		results = append(results, detail)
 	}
 	return api.GetWalletContractIdDeactivationDlq200JSONResponse{
-		Results: results, SearchSequenceToken: page.NextToken,
+		Results: results, ContinuationCursor: page.NextToken,
 	}, nil
 }
 
@@ -68,14 +67,18 @@ func dlqProblem(status int32, detail string) api.ProblemJson {
 func dlqDetail(walletID string, events []repo.ContractDeactivationErrorEvent) (api.WalletContractIdDeactivationDlqDetail, error) {
 	result := api.WalletContractIdDeactivationDlqDetail{Id: walletID}
 	if len(events) == 0 {
-		return result, fmt.Errorf("wallet %s has no deactivation error events", walletID)
+		return result, nil
 	}
 	latest := events[0]
 	for _, event := range events {
 		errorType := api.WalletContractIdDeactivationErrorErrorType(event.ErrorType)
 		id, err := uuid.Parse(event.ID)
-		if err != nil || id.String() != event.ID || event.ContractID == "" || event.Timestamp.IsZero() || event.AttemptNumber < 1 ||
+		if event.Malformed || err != nil || id.String() != event.ID || event.ContractID == "" || event.Timestamp.IsZero() || event.AttemptNumber < 1 ||
 			!errorType.Valid() || (event.HTTPErrorCode != nil && (*event.HTTPErrorCode < 100 || *event.HTTPErrorCode >= 600)) {
+			contractID := ""
+			deactivationErrors := []api.WalletContractIdDeactivationError{}
+			result.ContractId = &contractID
+			result.DeactivationErrors = &deactivationErrors
 			return result, fmt.Errorf("wallet %s has a malformed deactivation error event", walletID)
 		}
 		if event.Timestamp.After(latest.Timestamp) || (event.Timestamp.Equal(latest.Timestamp) &&
@@ -83,7 +86,8 @@ func dlqDetail(walletID string, events []repo.ContractDeactivationErrorEvent) (a
 			latest = event
 		}
 	}
-	result.ContractId = latest.ContractID
+	contractID := latest.ContractID
+	result.ContractId = &contractID
 	sort.Slice(events, func(i, j int) bool {
 		if events[i].AttemptNumber != events[j].AttemptNumber {
 			return events[i].AttemptNumber < events[j].AttemptNumber
@@ -93,13 +97,15 @@ func dlqDetail(walletID string, events []repo.ContractDeactivationErrorEvent) (a
 		}
 		return events[i].ID < events[j].ID
 	})
+	deactivationErrors := make([]api.WalletContractIdDeactivationError, 0, len(events))
 	for _, event := range events {
-		if event.ContractID == result.ContractId {
-			result.DeactivationErrors = append(result.DeactivationErrors, api.WalletContractIdDeactivationError{
+		if event.ContractID == contractID {
+			deactivationErrors = append(deactivationErrors, api.WalletContractIdDeactivationError{
 				ErrorType:     api.WalletContractIdDeactivationErrorErrorType(event.ErrorType),
 				HttpErrorCode: event.HTTPErrorCode, NpgErrorCode: event.NPGErrorCode,
 			})
 		}
 	}
+	result.DeactivationErrors = &deactivationErrors
 	return result, nil
 }
