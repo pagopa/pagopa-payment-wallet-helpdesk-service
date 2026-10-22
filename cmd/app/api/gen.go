@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // Defines values for WalletApplicationStatus.
@@ -257,6 +258,9 @@ type ServerInterface interface {
 	// GetWallets Retrieve wallets associated to an user id
 	// (GET /helpdesk/wallets/{userId})
 	GetWallets(c *gin.Context, userId UserId, params GetWalletsParams)
+	// ResetWalletDeactivationRetryCount Reset the wallet contract deactivation retry counter
+	// (PATCH /helpdesk/wallets/{walletId}/deactivationRetryCount)
+	ResetWalletDeactivationRetryCount(c *gin.Context, walletId openapi_types.UUID)
 	// GetServiceInfo Get information about this service.
 	// Currently returns just the version number.
 	// (GET /info)
@@ -351,6 +355,31 @@ func (siw *ServerInterfaceWrapper) GetWallets(c *gin.Context) {
 	siw.Handler.GetWallets(c, userId, params)
 }
 
+// ResetWalletDeactivationRetryCount operation middleware
+func (siw *ServerInterfaceWrapper) ResetWalletDeactivationRetryCount(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "walletId" -------------
+	var walletId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "walletId", c.Param("walletId"), &walletId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter walletId: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ResetWalletDeactivationRetryCount(c, walletId)
+}
+
 // GetServiceInfo operation middleware
 func (siw *ServerInterfaceWrapper) GetServiceInfo(c *gin.Context) {
 
@@ -393,6 +422,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 
 	router.GET(options.BaseURL+"/info", wrapper.GetServiceInfo)
 	router.GET(options.BaseURL+"/helpdesk/wallets/contractId/deactivations/dlq", wrapper.GetWalletContractIdDeactivationDlq)
+	router.PATCH(options.BaseURL+"/helpdesk/wallets/:walletId/deactivationRetryCount", wrapper.ResetWalletDeactivationRetryCount)
 	router.GET(options.BaseURL+"/helpdesk/wallets/:userId", wrapper.GetWallets)
 }
 
@@ -553,6 +583,78 @@ func (response GetWallets500JSONResponse) VisitGetWalletsResponse(w http.Respons
 	return err
 }
 
+type ResetWalletDeactivationRetryCountRequestObject struct {
+	WalletId openapi_types.UUID `json:"walletId"`
+}
+
+type ResetWalletDeactivationRetryCountResponseObject interface {
+	VisitResetWalletDeactivationRetryCountResponse(w http.ResponseWriter) error
+}
+
+type ResetWalletDeactivationRetryCount204Response struct {
+}
+
+func (response ResetWalletDeactivationRetryCount204Response) VisitResetWalletDeactivationRetryCountResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type ResetWalletDeactivationRetryCount400JSONResponse ProblemJson
+
+func (response ResetWalletDeactivationRetryCount400JSONResponse) VisitResetWalletDeactivationRetryCountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResetWalletDeactivationRetryCount401JSONResponse ProblemJson
+
+func (response ResetWalletDeactivationRetryCount401JSONResponse) VisitResetWalletDeactivationRetryCountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResetWalletDeactivationRetryCount404JSONResponse ProblemJson
+
+func (response ResetWalletDeactivationRetryCount404JSONResponse) VisitResetWalletDeactivationRetryCountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResetWalletDeactivationRetryCount500JSONResponse ProblemJson
+
+func (response ResetWalletDeactivationRetryCount500JSONResponse) VisitResetWalletDeactivationRetryCountResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetServiceInfoRequestObject struct {
 }
 
@@ -596,6 +698,9 @@ type StrictServerInterface interface {
 	// GetWallets Retrieve wallets associated to an user id
 	// (GET /helpdesk/wallets/{userId})
 	GetWallets(ctx context.Context, request GetWalletsRequestObject) (GetWalletsResponseObject, error)
+	// ResetWalletDeactivationRetryCount Reset the wallet contract deactivation retry counter
+	// (PATCH /helpdesk/wallets/{walletId}/deactivationRetryCount)
+	ResetWalletDeactivationRetryCount(ctx context.Context, request ResetWalletDeactivationRetryCountRequestObject) (ResetWalletDeactivationRetryCountResponseObject, error)
 	// GetServiceInfo Get information about this service.
 	// Currently returns just the version number.
 	// (GET /info)
@@ -705,6 +810,32 @@ func (sh *strictHandler) GetWallets(ctx *gin.Context, userId UserId, params GetW
 		sh.options.HandlerErrorFunc(ctx, err)
 	} else if validResponse, ok := response.(GetWalletsResponseObject); ok {
 		if err := validResponse.VisitGetWalletsResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ResetWalletDeactivationRetryCount operation middleware
+func (sh *strictHandler) ResetWalletDeactivationRetryCount(ctx *gin.Context, walletId openapi_types.UUID) {
+	var request ResetWalletDeactivationRetryCountRequestObject
+
+	request.WalletId = walletId
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ResetWalletDeactivationRetryCount(ctx, request.(ResetWalletDeactivationRetryCountRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ResetWalletDeactivationRetryCount")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(ResetWalletDeactivationRetryCountResponseObject); ok {
+		if err := validResponse.VisitResetWalletDeactivationRetryCountResponse(ctx.Writer); err != nil {
 			sh.options.ResponseErrorHandlerFunc(ctx, err)
 		}
 	} else if response != nil {

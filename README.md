@@ -249,6 +249,30 @@ completion. Without `MONGO_INTEGRATION_URI`, MongoDB integration tests are skipp
 the unit and validator regression tests still run. The DLQ tests do not validate
 the target Cosmos DB deployment or APIM configuration.
 
+### Reset wallet deactivation retry counter
+
+```shell
+curl -i -X PATCH \
+  'http://localhost:8080/helpdesk/wallets/<walletId>/deactivationRetryCount'
+```
+
+The endpoint takes no request body. `walletId` must be a canonical lowercase UUID.
+It atomically sets `deactivationRetryCount` to `0` in the `payment-wallets`
+collection, without changing other fields. Any existing wallet can be updated,
+regardless of status or DLQ membership. A missing counter is initialized to zero.
+It does not modify the DLQ or directly trigger a deactivation attempt.
+
+Success returns an empty HTTP 204 response, including when the counter was already
+zero. An invalid wallet ID returns 400, a missing wallet returns 404 (no upsert),
+and database errors return a logged 500 without exposing internal details.
+Errors use `ProblemJson`. As with other wallet endpoints, authentication and
+authorization must be enforced by APIM.
+
+The HTTP integration tests exercise the reset against disposable MongoDB databases,
+including repeated requests, missing counters, missing wallets and preservation
+of other wallet fields, other wallets and DLQ entries. Run them with the
+`MONGO_INTEGRATION_URI` command above.
+
 #### Performance testing
 
 Performance tests are not yet automated.

@@ -24,6 +24,17 @@ func NewPaymentWalletRepository(db *mongo.Client) *PaymentWalletRepository {
 	}
 }
 
+func (p *PaymentWalletRepository) ResetDeactivationRetryCount(ctx context.Context, walletID string) (bool, error) {
+	result, err := p.collection.UpdateOne(ctx,
+		bson.M{"_id": walletID},
+		bson.M{"$set": bson.M{"deactivationRetryCount": 0}},
+	)
+	if err != nil {
+		return false, fmt.Errorf("error resetting wallet deactivation retry count: %w", err)
+	}
+	return result.MatchedCount > 0, nil
+}
+
 func (p *PaymentWalletRepository) GetWallets(userID string, walletStatus *string, walletType *string, ctx context.Context) ([]WalletModel, error) {
 	var wallets []WalletModel
 	filter := make(bson.D, 0)
