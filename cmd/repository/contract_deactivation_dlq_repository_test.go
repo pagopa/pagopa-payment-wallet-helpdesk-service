@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"os"
 	"reflect"
@@ -18,21 +19,23 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
-func TestDlqDocumentsRequireISOTimestampString(t *testing.T) {
+func TestDlqDocumentsRequireStringTimestamp(t *testing.T) {
 	at := time.Date(2026, 8, 11, 13, 24, 47, 978419012, time.UTC)
 	for _, tc := range []struct {
-		name      string
-		timestamp interface{}
-		wantError bool
+		name               string
+		timestamp          interface{}
+		wantEntryError     bool
+		wantEventMalformed bool
+		wantEventTimestamp bool
 	}{
-		{"date", at, true},
-		{"ISO string", at.Format(time.RFC3339Nano), false},
-		{"ISO offset", "2026-08-11T15:24:47.978419012+02:00", false},
-		{"invalid string", "invalid", true},
-		{"empty string", "", true},
-		{"milliseconds integer", at.UnixMilli(), true},
-		{"BSON timestamp", primitive.Timestamp{T: uint32(at.Unix())}, true},
-		{"null", nil, true},
+		{name: "date", timestamp: at, wantEntryError: true, wantEventMalformed: true},
+		{name: "ISO string", timestamp: at.Format(time.RFC3339Nano), wantEventTimestamp: true},
+		{name: "ISO offset", timestamp: "2026-08-11T15:24:47.978419012+02:00", wantEventTimestamp: true},
+		{name: "invalid string", timestamp: "invalid", wantEventMalformed: true},
+		{name: "empty string", timestamp: "", wantEventMalformed: true},
+		{name: "milliseconds integer", timestamp: at.UnixMilli(), wantEntryError: true, wantEventMalformed: true},
+		{name: "BSON timestamp", timestamp: primitive.Timestamp{T: uint32(at.Unix())}, wantEntryError: true, wantEventMalformed: true},
+		{name: "null", timestamp: nil, wantEntryError: true, wantEventMalformed: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			data, err := bson.Marshal(bson.M{
@@ -47,17 +50,20 @@ func TestDlqDocumentsRequireISOTimestampString(t *testing.T) {
 				t.Fatal(err)
 			}
 			var entry ContractDeactivationDlqEntry
-			if err := bson.Unmarshal(data, &entry); (err != nil) != tc.wantError {
-				t.Errorf("DLQ entry: want error %v, got %v", tc.wantError, err)
+			if err := bson.Unmarshal(data, &entry); (err != nil) != tc.wantEntryError {
+				t.Errorf("DLQ entry: want error %v, got %v", tc.wantEntryError, err)
+			}
+			if err := bson.Unmarshal(data, &entry); err == nil && entry.Timestamp != tc.timestamp {
+				t.Errorf("DLQ timestamp = %q, want %q", entry.Timestamp, tc.timestamp)
 			}
 			var event ContractDeactivationErrorEvent
 			if err := bson.Unmarshal(data, &event); err != nil {
 				t.Fatalf("event decoding must preserve malformed rows for per-wallet handling: %v", err)
 			}
-			if event.Malformed != tc.wantError {
-				t.Errorf("event malformed = %v, want %v", event.Malformed, tc.wantError)
+			if event.Malformed != tc.wantEventMalformed {
+				t.Errorf("event malformed = %v, want %v", event.Malformed, tc.wantEventMalformed)
 			}
-			if !tc.wantError && !event.Timestamp.Equal(at) {
+			if tc.wantEventTimestamp && !event.Timestamp.Equal(at) {
 				t.Errorf("event timestamp lost precision or offset: %s", event.Timestamp)
 			}
 		})
@@ -72,16 +78,50 @@ func TestDlqSearchRejectsInvalidPaginationBeforeDatabaseAccess(t *testing.T) {
 	}{
 		{-1, ""}, {0, ""}, {11, ""}, {1, "not-a-token"}, {1, "e30"},
 		{1, strings.Repeat("a", 513)},
-		{1, "eyJ2IjoxLCJ0IjowLCJpZCI6Im5vdC1hLXV1aWQifQ"},
 		{1, base64.RawURLEncoding.EncodeToString([]byte(`{"v":1,"t":1000,"id":"00000000-0000-4000-8000-000000000001"}`))},
-		{1, base64.RawURLEncoding.EncodeToString([]byte(`{"v":3,"t":"2026-08-11T13:24:47Z","id":"00000000-0000-4000-8000-000000000001"}`))},
-		{1, base64.RawURLEncoding.EncodeToString([]byte(`{"v":2,"t":"invalid","id":"00000000-0000-4000-8000-000000000001"}`))},
+		{1, base64.RawURLEncoding.EncodeToString([]byte(`{"v":2,"t":"2026-08-11T13:24:47Z","id":"00000000-0000-4000-8000-000000000001"}`))},
 		{1, base64.RawURLEncoding.EncodeToString([]byte(`{"v":2,"t":"2026-08-11T13:24:47Z","id":"00000000-0000-4000-8000-000000000001","extra":true}`))},
 		{1, base64.RawURLEncoding.EncodeToString([]byte(`{"v":2,"t":"2026-08-11T13:24:47Z","id":"00000000-0000-4000-8000-000000000001"} {}`))},
+		{1, base64.RawURLEncoding.EncodeToString([]byte(`{"v":3,"id":"00000000-0000-4000-8000-000000000001"}`))},
 	} {
 		if _, err := repository.Search(context.Background(), tc.size, tc.token); !errors.Is(err, ErrInvalidDlqPagination) {
 			t.Errorf("size %d, token %q: want pagination error, got %v", tc.size, tc.token, err)
 		}
+	}
+}
+
+func TestDecodeDlqSequenceTokenAcceptsNonRFC3339Timestamp(t *testing.T) {
+	const timestamp = "not-a-timestamp"
+	data, err := json.Marshal(dlqSequenceToken{
+		Version: 3, Timestamp: timestamp, ID: "wallet-id",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, err := decodeDlqSequenceToken(base64.RawURLEncoding.EncodeToString(data))
+	if err != nil {
+		t.Fatalf("non-RFC3339 string timestamp should be accepted in the cursor: %v", err)
+	}
+	if token.Timestamp != timestamp {
+		t.Fatalf("cursor timestamp = %q, want %q", token.Timestamp, timestamp)
+	}
+}
+
+func TestDecodeDlqSequenceTokenAcceptsNonUUIDWalletID(t *testing.T) {
+	const walletID = "wallet-id-not-a-uuid"
+	data, err := json.Marshal(dlqSequenceToken{
+		Version: 3, Timestamp: "2026-08-11T13:24:47Z", ID: walletID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded := base64.RawURLEncoding.EncodeToString(data)
+	token, err := decodeDlqSequenceToken(encoded)
+	if err != nil {
+		t.Fatalf("non-UUID wallet ID should be accepted in the continuation cursor: %v", err)
+	}
+	if token.ID != walletID {
+		t.Fatalf("cursor wallet ID = %q, want %q", token.ID, walletID)
 	}
 }
 
@@ -120,15 +160,15 @@ func TestDlqRepositoryIntegration(t *testing.T) {
 	repository := NewContractDeactivationDlqRepository(client)
 	at := "2026-08-11T13:24:47.978419012Z"
 	ids := []string{
-		"00000000-0000-4000-8000-000000000001",
+		"wallet-id-not-a-uuid",
 		"00000000-0000-4000-8000-000000000002",
 		"00000000-0000-4000-8000-000000000003",
 		"00000000-0000-4000-8000-000000000004",
 	}
 	_, err = db.Collection("custom-dlq").InsertMany(ctx, []interface{}{
-		bson.M{"_id": ids[2], "timestamp": "2026-08-11T13:24:47.978419013Z"},
+		bson.M{"_id": ids[2], "timestamp": at},
 		bson.M{"_id": ids[1], "timestamp": at},
-		bson.M{"_id": ids[0], "timestamp": at},
+		bson.M{"_id": ids[0], "timestamp": "2026-08-11T13:24:47.978419011Z"},
 		bson.M{"_id": ids[3], "timestamp": "2026-08-11T13:24:48.000000000Z"},
 	})
 	if err != nil {
@@ -151,18 +191,18 @@ func TestDlqRepositoryIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(page.Entries) != 1 || page.Entries[0].ID != ids[0] || page.NextToken == "" {
+	if len(page.Entries) != 1 || page.Entries[0].ID != ids[3] || page.NextToken == "" {
 		t.Fatalf("unexpected first page: %+v", page)
 	}
-	if len(page.Events) != 1 || page.Events[0].WalletID != ids[0] || page.Events[0].HTTPErrorCode != nil {
+	if len(page.Events) != 1 || page.Events[0].WalletID != ids[3] || page.Events[0].HTTPErrorCode != nil {
 		t.Fatalf("unexpected first-page events: %+v", page.Events)
 	}
 	token, err := decodeDlqSequenceToken(page.NextToken)
-	if err != nil || token.Timestamp != at {
+	if err != nil || token.Version != 3 || token.Timestamp != "2026-08-11T13:24:48.000000000Z" {
 		t.Fatalf("cursor must preserve the stored timestamp exactly: %+v, %v", token, err)
 	}
 	// The boundary entry may expire from the DLQ between requests.
-	if _, err := db.Collection("custom-dlq").DeleteOne(ctx, bson.M{"_id": ids[0]}); err != nil {
+	if _, err := db.Collection("custom-dlq").DeleteOne(ctx, bson.M{"_id": ids[3]}); err != nil {
 		t.Fatal(err)
 	}
 	page, err = repository.Search(ctx, 2, page.NextToken)
@@ -173,7 +213,7 @@ func TestDlqRepositoryIntegration(t *testing.T) {
 		t.Fatalf("want two entries, got %+v", page)
 	}
 	got := []string{page.Entries[0].ID, page.Entries[1].ID}
-	if !reflect.DeepEqual(got, ids[1:3]) || page.NextToken == "" {
+	if !reflect.DeepEqual(got, []string{ids[2], ids[1]}) || page.NextToken == "" {
 		t.Fatalf("unexpected second page: %+v", page)
 	}
 	if len(page.Events) != 1 || page.Events[0].HTTPErrorCode == nil || *page.Events[0].HTTPErrorCode != 500 ||
@@ -184,7 +224,7 @@ func TestDlqRepositoryIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(page.Entries) != 1 || page.Entries[0].ID != ids[3] || page.NextToken != "" {
+	if len(page.Entries) != 1 || page.Entries[0].ID != ids[0] || page.NextToken != "" {
 		t.Fatalf("unexpected final page: %+v", page)
 	}
 	page, err = repository.Search(ctx, 10, "")
@@ -199,8 +239,28 @@ func TestDlqRepositoryIntegration(t *testing.T) {
 	if _, err := db.Collection("custom-dlq").UpdateByID(ctx, ids[1], bson.M{"$set": bson.M{"timestamp": "invalid"}}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := repository.Search(ctx, 10, ""); err == nil {
-		t.Fatal("expected malformed DLQ timestamp to fail")
+	wantOrder := []string{ids[1], ids[2], ids[0]}
+	var gotOrder []string
+	cursorToken := ""
+	for {
+		page, err = repository.Search(ctx, 1, cursorToken)
+		if err != nil {
+			t.Fatalf("malformed string timestamp should not prevent page traversal: %v", err)
+		}
+		if len(page.Entries) != 1 {
+			t.Fatalf("expected one entry on each page, got %+v", page.Entries)
+		}
+		gotOrder = append(gotOrder, page.Entries[0].ID)
+		if page.Entries[0].ID == ids[1] && page.Entries[0].Timestamp != "invalid" {
+			t.Fatalf("malformed timestamp was not preserved: %+v", page.Entries[0])
+		}
+		if page.NextToken == "" {
+			break
+		}
+		cursorToken = page.NextToken
+	}
+	if !reflect.DeepEqual(gotOrder, wantOrder) {
+		t.Fatalf("unexpected traversal order with malformed timestamp: got %v, want %v", gotOrder, wantOrder)
 	}
 	if _, err := db.Collection("custom-dlq").UpdateByID(ctx, ids[1], bson.M{"$set": bson.M{"timestamp": at}}); err != nil {
 		t.Fatal(err)

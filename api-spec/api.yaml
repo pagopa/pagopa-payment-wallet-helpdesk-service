@@ -67,7 +67,7 @@ paths:
         - helpdesk
       description: |-
         Retrieve wallets with failed contract ID deactivations, ordered by DLQ
-        timestamp and wallet ID ascending. Errors belong to the latest contract
+        timestamp and wallet ID descending. Errors belong to the latest contract
         recorded for each wallet and are ordered by attempt number and timestamp.
       summary: Search the contract ID deactivation dead-letter queue
       parameters:

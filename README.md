@@ -189,26 +189,33 @@ curl -i --get 'http://localhost:8080/helpdesk/wallets/contractId/deactivations/d
 ```
 
 `pageSize` is required and must be between 1 and 10. Results are ordered by DLQ
-`timestamp` string (lexicographically) and `_id` ascending. Reuse the opaque
+`timestamp` string (lexicographically) and `_id` descending, so the most recent
+entries appear first. Reuse the opaque
 `continuationCursor` for the
 next page; an empty cursor in the response marks the final page. The cursor is a
 versioned URL-safe base64 JSON cursor, not a credential or an authorization
 boundary. Invalid cursors return 400. An empty page returns 404, including a
 continuation page whose remaining entries have expired.
-The cursor preserves the exact stored timestamp, including nanoseconds. Older BSON
-Date-based cursors are not supported; restart pagination without a cursor.
+The cursor preserves the exact stored timestamp, including nanoseconds. Older
+BSON Date-based cursors and v2 cursors from the previous ascending order are not
+supported; restart pagination without a cursor.
 
 The repository fetches at most `pageSize + 1` DLQ entries to detect another page
 and queries error events for the returned wallet IDs in one bulk query (no
 per-wallet queries or `$lookup`). Pagination is not a database snapshot: TTL
 expiry, inserts or timestamp updates can change subsequent pages.
 
-DLQ `_id` values and event `walletId` values must be canonical lowercase UUID
-strings. The DLQ ID is the wallet ID, not an event ID. Both collections must store
-`timestamp` as an RFC3339 string, for example `2026-08-11T13:24:47.978419012Z`,
-not a BSON Date. For chronological DLQ ordering, the producer must consistently
-use UTC (`Z`) and fixed fractional-second precision. Event timestamps are parsed
-as instants for contract selection and error ordering, preserving nanoseconds.
+DLQ `_id` values and event `walletId` values are matched as strings; wallet IDs
+do not need to be UUIDs. Event `_id` values must be canonical lowercase UUID
+strings for their details to be included. The DLQ ID is the wallet ID, not an
+event ID. The DLQ `timestamp` must be present as a string; non-RFC3339 strings
+are returned and used literally for sorting and pagination, so their position
+is deterministic but not necessarily chronological. For chronological DLQ
+ordering, the producer should consistently use RFC3339 UTC (`Z`) and fixed
+fractional-second precision. The compound `{ timestamp: 1, _id: 1 }` index can
+serve the reverse scan. Event timestamps must be RFC3339 strings and are
+parsed as instants for contract selection and error ordering, preserving
+nanoseconds.
 Events must
 use `_class = it.pagopa.wallet.audit.WalletContractIdDeactivationErrorEvent`
 and carry `contractId`, `errorType` and a 1-based `attemptNumber`.

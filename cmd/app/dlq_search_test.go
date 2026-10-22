@@ -80,7 +80,7 @@ func TestDlqSearchHTTPIntegration(t *testing.T) {
 		t.Fatalf("empty DLQ: want 404, got %d: %s", recorder.Code, recorder.Body.String())
 	}
 	at := "2026-08-11T13:24:47.978419012Z"
-	ids := []string{"00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002"}
+	ids := []string{"00000000-0000-4000-8000-000000000002", "00000000-0000-4000-8000-000000000001"}
 	for _, id := range ids {
 		if _, err := db.Collection("dlq").InsertOne(ctx, bson.M{"_id": id, "timestamp": at}); err != nil {
 			t.Fatal(err)

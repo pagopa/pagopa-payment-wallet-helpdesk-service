@@ -10,7 +10,6 @@ import (
 	"io"
 	"time"
 
-	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -56,7 +55,7 @@ func (event *ContractDeactivationErrorEvent) UnmarshalBSON(data []byte) error {
 		event.Malformed = true
 		return nil
 	}
-	if err := validateDlqTimestamp(data); err != nil {
+	if err := validateEventTimestamp(data); err != nil {
 		event.Malformed = true
 		return nil
 	}
@@ -70,13 +69,21 @@ func (event *ContractDeactivationErrorEvent) UnmarshalBSON(data []byte) error {
 }
 
 func decodeDlqTimestampDocument(data []byte, target interface{}) error {
-	if err := validateDlqTimestamp(data); err != nil {
+	if err := validateStringTimestamp(data); err != nil {
 		return err
 	}
 	return bson.Unmarshal(data, target)
 }
 
-func validateDlqTimestamp(data []byte) error {
+func validateStringTimestamp(data []byte) error {
+	_, ok := bson.Raw(data).Lookup("timestamp").StringValueOK()
+	if !ok {
+		return errors.New("contract deactivation timestamp must be a string")
+	}
+	return nil
+}
+
+func validateEventTimestamp(data []byte) error {
 	timestamp, ok := bson.Raw(data).Lookup("timestamp").StringValueOK()
 	if !ok {
 		return errors.New("contract deactivation timestamp must be an RFC3339 string")
@@ -131,11 +138,14 @@ func decodeDlqSequenceToken(encoded string) (dlqSequenceToken, error) {
 	if err := decoder.Decode(new(interface{})); err != io.EOF {
 		return token, ErrInvalidDlqPagination
 	}
-	id, err := uuid.Parse(token.ID)
-	if err != nil || id.String() != token.ID || token.Version != 2 {
+	var requiredFields struct {
+		Timestamp *string `json:"t"`
+		ID        *string `json:"id"`
+	}
+	if err := json.Unmarshal(data, &requiredFields); err != nil || requiredFields.Timestamp == nil || requiredFields.ID == nil {
 		return token, ErrInvalidDlqPagination
 	}
-	if _, err := time.Parse(time.RFC3339Nano, token.Timestamp); err != nil {
+	if token.Version != 3 {
 		return token, ErrInvalidDlqPagination
 	}
 	return token, nil
@@ -154,15 +164,15 @@ func (r *ContractDeactivationDlqRepository) Search(ctx context.Context, pageSize
 		}
 		at := token.Timestamp
 		filter = bson.D{{Key: "$or", Value: bson.A{
-			bson.D{{Key: "timestamp", Value: bson.D{{Key: "$gt", Value: at}}}},
+			bson.D{{Key: "timestamp", Value: bson.D{{Key: "$lt", Value: at}}}},
 			bson.D{
 				{Key: "timestamp", Value: at},
-				{Key: "_id", Value: bson.D{{Key: "$gt", Value: token.ID}}},
+				{Key: "_id", Value: bson.D{{Key: "$lt", Value: token.ID}}},
 			},
 		}}}
 	}
 	cursor, err := r.dlq.Find(ctx, filter, options.Find().
-		SetSort(bson.D{{Key: "timestamp", Value: 1}, {Key: "_id", Value: 1}}).
+		SetSort(bson.D{{Key: "timestamp", Value: -1}, {Key: "_id", Value: -1}}).
 		SetLimit(int64(pageSize+1)).
 		SetProjection(bson.D{{Key: "_id", Value: 1}, {Key: "timestamp", Value: 1}}))
 	if err != nil {
@@ -180,15 +190,11 @@ func (r *ContractDeactivationDlqRepository) Search(ctx context.Context, pageSize
 	}
 	ids := make([]string, len(page.Entries))
 	for i, entry := range page.Entries {
-		id, err := uuid.Parse(entry.ID)
-		if err != nil || id.String() != entry.ID {
-			return page, errors.New("invalid wallet ID or timestamp in contract deactivation DLQ")
-		}
 		ids[i] = entry.ID
 	}
 	if hasMore {
 		last := page.Entries[len(page.Entries)-1]
-		data, err := json.Marshal(dlqSequenceToken{Version: 2, Timestamp: last.Timestamp, ID: last.ID})
+		data, err := json.Marshal(dlqSequenceToken{Version: 3, Timestamp: last.Timestamp, ID: last.ID})
 		if err != nil {
 			return page, fmt.Errorf("encoding DLQ continuation token: %w", err)
 		}
