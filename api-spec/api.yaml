@@ -118,6 +118,55 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemJson'
 
+  /helpdesk/wallets/{walletId}/deactivationRetryCount:
+    patch:
+      operationId: resetWalletDeactivationRetryCount
+      tags:
+        - helpdesk
+      summary: Reset the wallet contract deactivation retry counter
+      description: |-
+        Set deactivationRetryCount to zero on an existing wallet, regardless of
+        its status. A missing counter is initialized to zero. Repeated requests
+        succeed even when the counter is already zero. No other wallet fields
+        or DLQ entries are changed, and no deactivation attempt is triggered
+        directly by this operation.
+      parameters:
+        - in: path
+          name: walletId
+          required: true
+          description: Wallet ID as a canonical lowercase UUID
+          schema:
+            type: string
+            format: uuid
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      responses:
+        '204':
+          description: Counter reset, or already zero
+        '400':
+          description: Invalid wallet ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemJson'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemJson'
+        '404':
+          description: Wallet not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemJson'
+        '500':
+          description: Database error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemJson'
+
   /helpdesk/wallets/{userId}:
     get:
       operationId: getWallets

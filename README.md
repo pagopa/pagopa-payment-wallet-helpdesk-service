@@ -14,6 +14,9 @@
             - [Unit testing](#unit-testing)
             - [Integration testing](#integration-testing)
             - [Performance testing](#performance-testing)
+    * [APIs](#apis)
+        + [Contract ID deactivation DLQ search](#contract-id-deactivation-dlq-search)
+        + [Reset wallet deactivation retry counter](#reset-wallet-deactivation-retry-counter)
     * [Dependency management 🔧](#dependency-management)
         + [Dependency lock](#dependency-lock)
         + [Dependency verification](#dependency-verification)
@@ -138,6 +141,7 @@ make test
 
 Runs all Go tests with the race detector. The MongoDB client test checks client
 creation only; it does not verify a connection or execute database queries.
+Reset service unit tests cover the 204/404/500 response mapping without MongoDB.
 
 #### Integration testing
 
@@ -178,6 +182,23 @@ require credentials; database connectivity is still needed for wallet queries.
 
 For wallet queries, replace the router placeholder with a real user ID, for
 example `/helpdesk/wallets/12345`, not `/helpdesk/wallets/:userId`.
+
+Run repository and HTTP integration tests against a disposable local MongoDB:
+
+```shell
+MONGO_INTEGRATION_URI=mongodb://localhost:27017 make test
+```
+
+The tests create uniquely named databases and drop only those databases on
+completion. Without `MONGO_INTEGRATION_URI`, MongoDB integration tests are skipped;
+the unit and validator regression tests still run. The DLQ tests do not validate
+the target Cosmos DB deployment or APIM configuration.
+
+#### Performance testing
+
+Performance tests are not yet automated.
+
+## APIs
 
 ### Contract ID deactivation DLQ search
 
@@ -245,20 +266,32 @@ producer before it starts writing records. On MongoDB, a TTL index cannot expire
 documents based on a string timestamp; verify the target Cosmos DB TTL mechanism
 separately rather than assuming date-based TTL behavior.
 
-Run repository and HTTP integration tests against a disposable local MongoDB:
+### Reset wallet deactivation retry counter
 
 ```shell
-MONGO_INTEGRATION_URI=mongodb://localhost:27017 make test
+curl -i -X PATCH \
+  'http://localhost:8080/helpdesk/wallets/<walletId>/deactivationRetryCount'
 ```
 
-The tests create uniquely named databases and drop only those databases on
-completion. Without `MONGO_INTEGRATION_URI`, MongoDB integration tests are skipped;
-the unit and validator regression tests still run. The DLQ tests do not validate
-the target Cosmos DB deployment or APIM configuration.
+The endpoint takes no request body. `walletId` must be a canonical lowercase UUID.
+It atomically sets `deactivationRetryCount` to `0` in the `payment-wallets`
+collection, without changing other fields. Any existing wallet can be updated,
+regardless of status or DLQ membership. A missing counter is initialized to zero.
+It does not modify the DLQ or directly trigger a deactivation attempt.
 
-#### Performance testing
+Success returns an empty HTTP 204 response, including when the counter was already
+zero. An invalid wallet ID returns 400, a missing wallet returns 404 (no upsert),
+and database errors return a logged 500 without exposing internal details.
+Errors use `ProblemJson`. As with other wallet endpoints, authentication and
+authorization must be enforced by APIM.
 
-Performance tests are not yet automated.
+Successful resets are logged with the wallet ID, including requests where the
+counter was already zero. This application log is not a persistent audit event.
+
+The HTTP integration tests exercise the reset against disposable MongoDB databases,
+including repeated requests, missing counters, missing wallets and preservation
+of other wallet fields, other wallets and DLQ entries. Run them with the
+`MONGO_INTEGRATION_URI` command above.
 
 ## Dependency management
 
