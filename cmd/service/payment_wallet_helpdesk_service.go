@@ -10,13 +10,18 @@ import (
 	repo "pagopa.it/pagopa-payment-wallet-helpdesk-service/cmd/repository"
 )
 
+type paymentWalletRepository interface {
+	GetWallets(string, *string, *string, context.Context) ([]repo.WalletModel, error)
+	ResetDeactivationRetryCount(context.Context, string) (bool, error)
+}
+
 type PaymentWalletHelpdeskService struct {
-	paymentWalletRepository repo.PaymentWalletRepository
+	paymentWalletRepository paymentWalletRepository
 }
 
 func NewPaymentWalletHelpdeskService(db *mongo.Client) *PaymentWalletHelpdeskService {
 	return &PaymentWalletHelpdeskService{
-		paymentWalletRepository: *repo.NewPaymentWalletRepository(db),
+		paymentWalletRepository: repo.NewPaymentWalletRepository(db),
 	}
 }
 
@@ -29,6 +34,7 @@ func (p *PaymentWalletHelpdeskService) ResetDeactivationRetryCount(ctx context.C
 	if !found {
 		return api.ResetWalletDeactivationRetryCount404JSONResponse(resetCounterProblem(404, "Wallet not found")), nil
 	}
+	log.Printf("Reset completed for wallet [%s]: deactivationRetryCount is zero", request.WalletId)
 	return api.ResetWalletDeactivationRetryCount204Response{}, nil
 }
 
