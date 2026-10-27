@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"path/filepath"
+	"runtime/debug"
 
 	"github.com/gin-gonic/gin"
 
@@ -24,20 +25,14 @@ func main() {
 		log.Fatalf("Unable to get path to api spec!: %v", err)
 	}
 
-	validator, err := newRequestValidator(validatorPath)
-	if err != nil {
-		log.Fatalf("Unable to load API validator: %v", err)
-	}
 	paymentWalletHelpdeskService := service.NewPaymentWalletHelpdeskService(cosmosdb)
-	server := newServerHandler(&Server{
+	r, err := newRouter(&Server{
 		paymentWalletHelpdeskService:   paymentWalletHelpdeskService,
 		contractDeactivationDlqService: service.NewContractDeactivationDlqService(cosmosdb),
-	})
-	r := gin.Default()
-
-	r.Use(validator)
-
-	api.RegisterHandlers(r, server)
+	}, validatorPath)
+	if err != nil {
+		log.Fatalf("Unable to configure HTTP router: %v", err)
+	}
 
 	s := &http.Server{
 		Handler: r,
@@ -45,4 +40,24 @@ func main() {
 	}
 
 	log.Fatal(s.ListenAndServe())
+}
+
+func newRouter(server api.StrictServerInterface, validatorPath string) (*gin.Engine, error) {
+	apiKeyFilter, err := newAPIKeyFilter()
+	if err != nil {
+		return nil, err
+	}
+	validator, err := newRequestValidator(validatorPath)
+	if err != nil {
+		return nil, err
+	}
+	router := gin.New()
+	router.Use(gin.Logger(), gin.CustomRecoveryWithWriter(nil, func(c *gin.Context, _ any) {
+		// Gin's default recovery dumps request headers, including x-api-key.
+		log.Printf("Recovered HTTP handler panic\n%s", debug.Stack())
+		c.AbortWithStatus(http.StatusInternalServerError)
+	}))
+	router.Use(apiKeyFilter, validator)
+	api.RegisterHandlers(router, newServerHandler(server))
+	return router, nil
 }
