@@ -1,7 +1,10 @@
 openapi: 3.0.3
 info:
   title: pagoPA payment wallet helpdesk API
-  description: pagoPA payment wallet helpdesk API
+  description: |-
+    pagoPA payment wallet helpdesk API. Wallet operations require an x-api-key
+    header matching the configured primary or secondary service API key.
+    GET /info is public.
   version: 1.0.0
   contact:
     name: pagoPA - Touchpoints team

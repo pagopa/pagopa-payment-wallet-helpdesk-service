@@ -28,7 +28,7 @@ func newRequestValidator(path string) (gin.HandlerFunc, error) {
 			})
 		},
 		Options: openapi3filter.Options{
-			// APIM enforces authentication; the backend must not be publicly reachable.
+			// The API key middleware authenticates requests before schema validation.
 			AuthenticationFunc: openapi3filter.NoopAuthenticationFunc,
 		},
 	}), nil

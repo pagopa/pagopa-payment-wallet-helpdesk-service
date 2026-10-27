@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -50,22 +49,20 @@ func TestDlqSearchHTTPIntegration(t *testing.T) {
 	t.Setenv(repo.PaymentWalletDBNameEnvKey, db.Name())
 	t.Setenv(repo.ContractDeactivationDlqCollectionNameEnvKey, "dlq")
 	t.Setenv(repo.WalletLogEventsCollectionNameEnvKey, "events")
-	validator, err := newRequestValidator("../../api-spec/api.yaml")
+	setTestAPIKeys(t)
+	router, err := newRouter(&Server{
+		contractDeactivationDlqService: service.NewContractDeactivationDlqService(client),
+	}, "../../api-spec/api.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
-	router := gin.New()
-	router.Use(validator)
-	api.RegisterHandlers(router, newServerHandler(&Server{
-		contractDeactivationDlqService: service.NewContractDeactivationDlqService(client),
-	}))
 	const path = "/helpdesk/wallets/contractId/deactivations/dlq"
 	for _, query := range []string{
 		"", "?pageSize=0", "?pageSize=11", "?pageSize=abc",
 		"?pageSize=1&continuationCursor=invalid",
 	} {
 		recorder := httptest.NewRecorder()
-		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path+query, nil))
+		router.ServeHTTP(recorder, authenticatedRequest(http.MethodGet, path+query))
 		if recorder.Code != http.StatusBadRequest {
 			t.Errorf("query %q: want 400, got %d: %s", query, recorder.Code, recorder.Body.String())
 		}
@@ -75,7 +72,7 @@ func TestDlqSearchHTTPIntegration(t *testing.T) {
 		}
 	}
 	recorder := httptest.NewRecorder()
-	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path+"?pageSize=1", nil))
+	router.ServeHTTP(recorder, authenticatedRequest(http.MethodGet, path+"?pageSize=1"))
 	if recorder.Code != http.StatusNotFound {
 		t.Fatalf("empty DLQ: want 404, got %d: %s", recorder.Code, recorder.Body.String())
 	}
@@ -96,8 +93,8 @@ func TestDlqSearchHTTPIntegration(t *testing.T) {
 	token := ""
 	for i, id := range ids {
 		recorder := httptest.NewRecorder()
-		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet,
-			path+"?pageSize=1&continuationCursor="+url.QueryEscape(token), nil))
+		router.ServeHTTP(recorder, authenticatedRequest(http.MethodGet,
+			path+"?pageSize=1&continuationCursor="+url.QueryEscape(token)))
 		if recorder.Code != http.StatusOK {
 			t.Fatalf("page %d: want 200, got %d: %s", i, recorder.Code, recorder.Body.String())
 		}
@@ -123,7 +120,7 @@ func TestDlqSearchHTTPIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	recorder = httptest.NewRecorder()
-	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path+"?pageSize=1", nil))
+	router.ServeHTTP(recorder, authenticatedRequest(http.MethodGet, path+"?pageSize=1"))
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("malformed event: want 200, got %d: %s", recorder.Code, recorder.Body.String())
 	}
@@ -143,7 +140,7 @@ func TestDlqSearchHTTPIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	recorder = httptest.NewRecorder()
-	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path+"?pageSize=1", nil))
+	router.ServeHTTP(recorder, authenticatedRequest(http.MethodGet, path+"?pageSize=1"))
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("malformed event timestamp: want 200, got %d: %s", recorder.Code, recorder.Body.String())
 	}
@@ -163,7 +160,7 @@ func TestDlqSearchHTTPIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	recorder = httptest.NewRecorder()
-	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path+"?pageSize=1", nil))
+	router.ServeHTTP(recorder, authenticatedRequest(http.MethodGet, path+"?pageSize=1"))
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("missing events: want 200, got %d: %s", recorder.Code, recorder.Body.String())
 	}
