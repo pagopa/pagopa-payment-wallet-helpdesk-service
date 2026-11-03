@@ -334,8 +334,8 @@ stages:
             timeoutInMinutes: 30
             inputs:
               notifyUsers: $(APPROVE_TOUCHPOINT_MAIL)
-              instructions: "Please approve or reject PROD promotions for release $(release_url)"
-              onTimeout: 'skip'
+              instructions: "APPROVE ONLY TO ROLLBACK PROD to the previous Helm revision. Reject to keep the current version (release $(release_url))."
+              onTimeout: 'reject'
 
   - stage: "Prod_RollbackToLatestRelease"
     displayName: 'PROD rollback to the latest Release'
