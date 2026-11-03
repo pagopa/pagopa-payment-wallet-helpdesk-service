@@ -16,7 +16,7 @@ jobs:
     name: Check Required Labels
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@50fbc622fc4ef5163becd7fab6573eac35f8462e # v1
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: ./.github/actions/check-pr-semver-labels
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
