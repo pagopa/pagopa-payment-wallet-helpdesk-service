@@ -121,7 +121,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: prod
     permissions:
-      contents: write
+      contents: read
     steps:
       - name: Checkout release branch
         uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
@@ -148,7 +148,7 @@ jobs:
           commit: ${{ steps.setup_github_release.outputs.HEAD_SHA }}
           tag: ${{ steps.setup_github_release.outputs.TAG }}
           name: ${{ steps.setup_github_release.outputs.TITLE }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.BOT_GITHUB_TOKEN }}
           makeLatest: true
           generateReleaseNotes: true
           draft: false
