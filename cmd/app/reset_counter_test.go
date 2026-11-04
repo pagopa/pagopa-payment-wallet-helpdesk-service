@@ -113,6 +113,17 @@ func TestResetCounterHTTPIntegration(t *testing.T) {
 			if _, err := wallets.InsertOne(ctx, document); err != nil {
 				t.Fatal(err)
 			}
+			unauthorized := httptest.NewRecorder()
+			router.ServeHTTP(unauthorized, httptest.NewRequest(http.MethodPatch,
+				"/helpdesk/wallets/"+id+"/deactivationRetryCount", nil))
+			assertResetProblem(t, unauthorized, http.StatusUnauthorized)
+			var unchanged bson.M
+			if err := wallets.FindOne(ctx, bson.M{"_id": id}).Decode(&unchanged); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(unchanged, document) {
+				t.Fatalf("unauthorized reset modified the wallet: %#v", unchanged)
+			}
 			dlq := bson.M{"_id": id, "timestamp": "2026-08-11T13:24:47Z"}
 			if tc.inDLQ {
 				if _, err := db.Collection("wallet-contractId-deactivation-dlq").InsertOne(ctx, dlq); err != nil {
@@ -121,8 +132,8 @@ func TestResetCounterHTTPIntegration(t *testing.T) {
 			}
 			for attempt := 0; attempt < 2; attempt++ {
 				recorder := httptest.NewRecorder()
-				router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPatch,
-					"/helpdesk/wallets/"+id+"/deactivationRetryCount", nil))
+				router.ServeHTTP(recorder, authenticatedRequest(http.MethodPatch,
+					"/helpdesk/wallets/"+id+"/deactivationRetryCount"))
 				if recorder.Code != http.StatusNoContent || recorder.Body.Len() != 0 {
 					t.Fatalf("attempt %d: want empty 204, got %d: %s", attempt, recorder.Code, recorder.Body.String())
 				}
@@ -152,8 +163,8 @@ func TestResetCounterHTTPIntegration(t *testing.T) {
 		})
 	}
 	recorder := httptest.NewRecorder()
-	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPatch,
-		"/helpdesk/wallets/00000000-0000-4000-8000-000000000098/deactivationRetryCount", nil))
+	router.ServeHTTP(recorder, authenticatedRequest(http.MethodPatch,
+		"/helpdesk/wallets/00000000-0000-4000-8000-000000000098/deactivationRetryCount"))
 	assertResetProblem(t, recorder, http.StatusNotFound)
 	count, err := wallets.CountDocuments(ctx, bson.M{"_id": "00000000-0000-4000-8000-000000000098"})
 	if err != nil || count != 0 {
@@ -180,8 +191,8 @@ func TestResetCounterDatabaseFailure(t *testing.T) {
 	}
 	router := resetCounterRouter(t, client)
 	recorder := httptest.NewRecorder()
-	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPatch,
-		"/helpdesk/wallets/00000000-0000-4000-8000-000000000001/deactivationRetryCount", nil))
+	router.ServeHTTP(recorder, authenticatedRequest(http.MethodPatch,
+		"/helpdesk/wallets/00000000-0000-4000-8000-000000000001/deactivationRetryCount"))
 	assertResetProblem(t, recorder, http.StatusInternalServerError)
 	if strings.Contains(recorder.Body.String(), "disconnected") {
 		t.Fatalf("internal database error leaked: %s", recorder.Body.String())
@@ -190,15 +201,13 @@ func TestResetCounterDatabaseFailure(t *testing.T) {
 
 func resetCounterRouter(t *testing.T, client *mongo.Client) *gin.Engine {
 	t.Helper()
-	validator, err := newRequestValidator("../../api-spec/api.yaml")
+	setTestAPIKeys(t)
+	router, err := newRouter(&Server{
+		paymentWalletHelpdeskService: service.NewPaymentWalletHelpdeskService(client),
+	}, "../../api-spec/api.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
-	router := gin.New()
-	router.Use(validator)
-	api.RegisterHandlers(router, newServerHandler(&Server{
-		paymentWalletHelpdeskService: service.NewPaymentWalletHelpdeskService(client),
-	}))
 	return router
 }
 
