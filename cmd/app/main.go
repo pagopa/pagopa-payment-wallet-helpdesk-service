@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 
 	"github.com/gin-gonic/gin"
-	ginmiddleware "github.com/oapi-codegen/gin-middleware"
 
 	"net/http"
 
@@ -25,14 +24,14 @@ func main() {
 		log.Fatalf("Unable to get path to api spec!: %v", err)
 	}
 
-	validator, err := ginmiddleware.OapiValidatorFromYamlFile(validatorPath)
+	validator, err := newRequestValidator(validatorPath)
 	if err != nil {
-		log.Fatalf("Unable to get api spec: unable to read validator in path %s", validatorPath)
+		log.Fatalf("Unable to load API validator: %v", err)
 	}
 	paymentWalletHelpdeskService := service.NewPaymentWalletHelpdeskService(cosmosdb)
-	server := api.NewStrictHandler(&Server{
+	server := newServerHandler(&Server{
 		paymentWalletHelpdeskService: paymentWalletHelpdeskService,
-	}, []api.StrictMiddlewareFunc{})
+	})
 	r := gin.Default()
 
 	r.Use(validator)
