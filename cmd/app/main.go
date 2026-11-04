@@ -52,9 +52,9 @@ func newRouter(server api.StrictServerInterface, validatorPath string) (*gin.Eng
 		return nil, err
 	}
 	router := gin.New()
-	router.Use(gin.Logger(), gin.CustomRecoveryWithWriter(nil, func(c *gin.Context, _ any) {
-		// Gin's default recovery dumps request headers, including x-api-key.
-		log.Printf("Recovered HTTP handler panic\n%s", debug.Stack())
+	router.Use(gin.Logger(), gin.CustomRecoveryWithWriter(nil, func(c *gin.Context, recovered any) {
+                // Gin's default recovery dumps request headers, including x-api-key.
+                log.Printf("Recovered HTTP handler panic: %v\n%s", recovered, debug.Stack())
 		c.AbortWithStatus(http.StatusInternalServerError)
 	}))
 	router.Use(apiKeyFilter, validator)
