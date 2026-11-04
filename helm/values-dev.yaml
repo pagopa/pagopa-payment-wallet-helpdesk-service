@@ -71,8 +71,8 @@ microservice-chart:
     cooldownPeriod: 50 # seconds
     triggers:
       - type: cpu
+        metricType: Utilization # Allowed types are 'Utilization' or 'AverageValue'
         metadata:
-          type: Utilization # Allowed types are 'Utilization' or 'AverageValue'
           value: "75"
   terminationGracePeriodSeconds: 30
   strategy:
