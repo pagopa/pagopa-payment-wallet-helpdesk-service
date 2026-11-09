@@ -42,6 +42,10 @@ func (s *Server) GetWallets(c context.Context, params api.GetWalletsRequestObjec
 	return s.paymentWalletHelpdeskService.SearchWallets(c, params)
 }
 
+func (s *Server) ResetWalletDeactivationRetryCount(ctx context.Context, request api.ResetWalletDeactivationRetryCountRequestObject) (api.ResetWalletDeactivationRetryCountResponseObject, error) {
+	return s.paymentWalletHelpdeskService.ResetDeactivationRetryCount(ctx, request)
+}
+
 //lint:ignore ST1003 Method name must match the generated OpenAPI interface.
 func (s *Server) GetWalletContractIdDeactivationDlq(ctx context.Context, request api.GetWalletContractIdDeactivationDlqRequestObject) (api.GetWalletContractIdDeactivationDlqResponseObject, error) {
 	return s.contractDeactivationDlqService.Search(ctx, request)
