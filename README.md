@@ -62,7 +62,10 @@ If you want to start the application without too much hassle, you can just copy 
 $ cp .env.example .env
 ```
 
-to get a good default configuration.
+to get the local database configuration. Before starting, set
+`SECURITY_API_KEYS_PRIMARY` and `SECURITY_API_KEYS_SECONDARY` in `.env` to two
+independently generated secret values. They are intentionally empty in
+`.env.example`; there are no default API keys.
 
 If you want to customize the application environment, reference this table:
 
@@ -71,7 +74,23 @@ If you want to customize the application environment, reference this table:
 | `MONGO_DB_NAME` | Database shared by wallet, DLQ and event collections; set `payment-wallet` for the target wallet database | string | `wallet` |
 | `PAYMENT_WALLET_CONTRACT_DEACTIVATION_DLQ_COLLECTION_NAME` | DLQ collection | string | `wallet-contractId-deactivation-dlq` |
 | `PAYMENT_WALLET_LOG_EVENTS_COLLECTION_NAME` | Wallet audit event collection | string | `payment-wallets-log-events` |
+| `SECURITY_API_KEYS_SECURED_PATHS` | Required comma-separated path prefixes protected by the API key middleware | string | No application default; `/helpdesk/` in example and Helm |
+| `SECURITY_API_KEYS_PRIMARY` | Required primary API key | secret string | None |
+| `SECURITY_API_KEYS_SECONDARY` | Required secondary API key, accepted alongside primary for rotation | secret string | None |
 
+Configuration is loaded once at startup. Empty/blank keys, empty prefix lists,
+empty list entries and invalid path prefixes prevent startup. Prefixes must
+start with `/` and contain no whitespace, query string or fragment. Prefix list
+whitespace is trimmed; API keys are compared exactly and never trimmed.
+
+The Helm development values reference the Key Vault secrets
+`payment-wallet-helpdesk-service-primary-api-key` and
+`payment-wallet-helpdesk-service-secondary-api-key`. Provision these secrets before
+deploying, or change the `envSecret` mappings to the actual secret names.
+APIM must forward `x-api-key` with one of these service key values; an APIM
+subscription key is not automatically a valid service key. Rotate one key at a
+time, restarting the application to load updated values while the other key
+remains usable.
 
 ### Run docker container
 
@@ -153,8 +172,9 @@ in the target environment before releasing.
 The application removes the OpenAPI `servers` list from its in-memory validator
 specification, so documented deployment URLs do not restrict local or Kubernetes
 probe requests. The published specification is unchanged; request parameter and
-body validation remain enabled. Authentication and authorization are delegated
-to Azure API Management (APIM), not enforced by the application validator.
+body validation remain enabled. A Gin middleware validates the API key before
+the OpenAPI schema validator. APIM remains an additional authentication and
+authorization layer.
 All request validator errors use the `ProblemJson` shape (`status`, `title`,
 `detail`), including wallet parameter errors and unknown operations. This replaces
 the previous `{"error": "..."}` body for non-DLQ routes; HTTP statuses are unchanged.
@@ -170,15 +190,32 @@ curl -i http://localhost:8080/info
 the Kubernetes liveness and readiness probes to reach the endpoint.
 
 Wallet endpoints retain the global `ApiKeyAuth` requirement in the published
-OpenAPI contract for APIM and API consumers. The application validator explicitly
-uses `openapi3filter.NoopAuthenticationFunc`: it does not check API key presence
-or validity, whether or not APIM forwards the header. Schema and parameter
-validation still apply.
+OpenAPI contract for APIM and API consumers. The API key middleware protects
+every HTTP method whose decoded request path starts with one of
+`SECURITY_API_KEYS_SECURED_PATHS` (case-sensitive prefix matching). Keep
+`/helpdesk/` in that list to cover all wallet operations. Other prefixes can be
+added as comma-separated values. `GET /info` is always public, even if a
+configured prefix would otherwise match it.
+
+Protected requests require exactly one non-empty `x-api-key` header matching
+either the primary or secondary key. Missing, invalid, combined or duplicate
+headers return HTTP 401 with `ProblemJson`, before schema validation or database
+access. API keys are compared using constant-time comparisons of fixed-size
+SHA-256 hashes, and neither received nor configured keys are logged.
+Authentication failures are logged without header values.
+The OpenAPI validator retains `openapi3filter.NoopAuthenticationFunc` because
+the preceding middleware performs authentication; schema and parameter validation
+still apply to authenticated requests.
 
 Before deployment, verify that APIM policies enforce authentication and
 authorization and that network and ingress restrictions prevent clients from
-reaching wallet endpoints directly, bypassing APIM. Direct local access does not
-require credentials; database connectivity is still needed for wallet queries.
+reaching wallet endpoints directly, bypassing APIM. Direct local access now
+requires a service API key as well; database connectivity is still needed for
+wallet queries.
+
+In Postman, set the `api-key` variable locally to either configured service key.
+Wallet requests inherit collection-level `x-api-key` authentication; the service
+info request explicitly uses no authentication. Do not export populated secrets.
 
 For wallet queries, replace the router placeholder with a real user ID, for
 example `/helpdesk/wallets/12345`, not `/helpdesk/wallets/:userId`.
@@ -191,7 +228,11 @@ MONGO_INTEGRATION_URI=mongodb://localhost:27017 make test
 
 The tests create uniquely named databases and drop only those databases on
 completion. Without `MONGO_INTEGRATION_URI`, MongoDB integration tests are skipped;
-the unit and validator regression tests still run. The DLQ tests do not validate
+the unit and validator regression tests still run. Authentication tests cover
+both keys, rejected headers, protected prefixes, startup configuration errors,
+public probes and authentication before schema validation. HTTP integration
+tests also verify that an unauthenticated reset does not modify the wallet.
+The DLQ tests do not validate
 the target Cosmos DB deployment or APIM configuration.
 
 #### Performance testing
@@ -203,8 +244,10 @@ Performance tests are not yet automated.
 ### Contract ID deactivation DLQ search
 
 ```shell
-curl -i 'http://localhost:8080/helpdesk/wallets/contractId/deactivations/dlq?pageSize=10'
+curl -i -H "x-api-key: ${SECURITY_API_KEYS_PRIMARY}" \
+  'http://localhost:8080/helpdesk/wallets/contractId/deactivations/dlq?pageSize=10'
 curl -i --get 'http://localhost:8080/helpdesk/wallets/contractId/deactivations/dlq' \
+  -H "x-api-key: ${SECURITY_API_KEYS_PRIMARY}" \
   --data-urlencode 'pageSize=10' \
   --data-urlencode 'continuationCursor=<cursor returned by the previous page>'
 ```
@@ -270,6 +313,7 @@ separately rather than assuming date-based TTL behavior.
 
 ```shell
 curl -i -X PATCH \
+  -H "x-api-key: ${SECURITY_API_KEYS_PRIMARY}" \
   'http://localhost:8080/helpdesk/wallets/<walletId>/deactivationRetryCount'
 ```
 
@@ -282,8 +326,8 @@ It does not modify the DLQ or directly trigger a deactivation attempt.
 Success returns an empty HTTP 204 response, including when the counter was already
 zero. An invalid wallet ID returns 400, a missing wallet returns 404 (no upsert),
 and database errors return a logged 500 without exposing internal details.
-Errors use `ProblemJson`. As with other wallet endpoints, authentication and
-authorization must be enforced by APIM.
+Errors use `ProblemJson`. As with other wallet endpoints, the API key middleware
+authenticates requests, with APIM enforcing additional access policies.
 
 Successful resets are logged with the wallet ID, including requests where the
 counter was already zero. This application log is not a persistent audit event.
