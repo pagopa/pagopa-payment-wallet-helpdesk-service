@@ -83,12 +83,17 @@ jobs:
             git add "$i"
           done
 
-      - name: Update Chart App Version
+      - name: Update App Version
         run: |
           CHART_FILE="helm/Chart.yaml"
           if [[ -f "$CHART_FILE" ]]; then
             yq -i ".appVersion = \"${{ steps.get_new_ver.outputs.version }}\"" "$CHART_FILE"
             git add "$CHART_FILE"
+          fi
+          VERSION_FILE="cmd/app/version.txt"
+          if [[ -f "$VERSION_FILE" ]]; then
+            printf '%s' "${{ steps.get_new_ver.outputs.version }}" > "$VERSION_FILE"
+            git add "$VERSION_FILE"
           fi
 
       - name: Update Chart Version
