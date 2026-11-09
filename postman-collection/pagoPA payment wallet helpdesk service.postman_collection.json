@@ -5,10 +5,33 @@
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "23963988"
 	},
+	"auth": {
+		"type": "apikey",
+		"apikey": [
+			{
+				"key": "key",
+				"value": "x-api-key",
+				"type": "string"
+			},
+			{
+				"key": "value",
+				"value": "{{api-key}}",
+				"type": "string"
+			},
+			{
+				"key": "in",
+				"value": "header",
+				"type": "string"
+			}
+		]
+	},
 	"item": [
 		{
 			"name": "Get service info",
 			"request": {
+				"auth": {
+					"type": "noauth"
+				},
 				"method": "GET",
 				"header": [],
 				"url": {
@@ -22,6 +45,29 @@
 						"info"
 					]
 				}
+			},
+			"response": []
+		},
+		{
+			"name": "Reset wallet deactivation retry counter",
+			"request": {
+				"method": "PATCH",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/helpdesk/wallets/{{wallet-id}}/deactivationRetryCount",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"helpdesk",
+						"wallets",
+						"{{wallet-id}}",
+						"deactivationRetryCount"
+					]
+				},
+				"description": "Set deactivationRetryCount to zero on an existing wallet. Use a canonical lowercase UUID for wallet-id. No body is required. Success returns 204, including when the counter is already zero."
 			},
 			"response": []
 		},
@@ -58,6 +104,41 @@
 						}
 					]
 				}
+			},
+			"response": []
+		},
+		{
+			"name": "Search contract deactivation DLQ",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/helpdesk/wallets/contractId/deactivations/dlq?pageSize=10",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"helpdesk",
+						"wallets",
+						"contractId",
+						"deactivations",
+						"dlq"
+					],
+					"query": [
+						{
+							"key": "pageSize",
+							"value": "10"
+						},
+						{
+							"key": "continuationCursor",
+							"value": "{{continuationCursor}}",
+							"disabled": true
+						}
+					]
+				},
+				"description": "Use the continuationCursor returned by the previous page to fetch the next page."
 			},
 			"response": []
 		}

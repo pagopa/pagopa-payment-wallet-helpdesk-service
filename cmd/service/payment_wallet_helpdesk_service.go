@@ -10,14 +10,37 @@ import (
 	repo "pagopa.it/pagopa-payment-wallet-helpdesk-service/cmd/repository"
 )
 
+type paymentWalletRepository interface {
+	GetWallets(string, *string, *string, context.Context) ([]repo.WalletModel, error)
+	ResetDeactivationRetryCount(context.Context, string) (bool, error)
+}
+
 type PaymentWalletHelpdeskService struct {
-	paymentWalletRepository repo.PaymentWalletRepository
+	paymentWalletRepository paymentWalletRepository
 }
 
 func NewPaymentWalletHelpdeskService(db *mongo.Client) *PaymentWalletHelpdeskService {
 	return &PaymentWalletHelpdeskService{
-		paymentWalletRepository: *repo.NewPaymentWalletRepository(db),
+		paymentWalletRepository: repo.NewPaymentWalletRepository(db),
 	}
+}
+
+func (p *PaymentWalletHelpdeskService) ResetDeactivationRetryCount(ctx context.Context, request api.ResetWalletDeactivationRetryCountRequestObject) (api.ResetWalletDeactivationRetryCountResponseObject, error) {
+	found, err := p.paymentWalletRepository.ResetDeactivationRetryCount(ctx, request.WalletId.String())
+	if err != nil {
+		log.Printf("Error resetting wallet deactivation retry count: %v", err)
+		return api.ResetWalletDeactivationRetryCount500JSONResponse(resetCounterProblem(500, "Unable to reset wallet deactivation retry count")), nil
+	}
+	if !found {
+		return api.ResetWalletDeactivationRetryCount404JSONResponse(resetCounterProblem(404, "Wallet not found")), nil
+	}
+	log.Printf("Reset completed for wallet [%s]: deactivationRetryCount is zero", request.WalletId)
+	return api.ResetWalletDeactivationRetryCount204Response{}, nil
+}
+
+func resetCounterProblem(status int32, detail string) api.ProblemJson {
+	title := "Wallet deactivation retry counter reset"
+	return api.ProblemJson{Status: &status, Title: &title, Detail: &detail}
 }
 
 func (p *PaymentWalletHelpdeskService) SearchWallets(c context.Context, request api.GetWalletsRequestObject) (api.GetWalletsResponseObject, error) {
