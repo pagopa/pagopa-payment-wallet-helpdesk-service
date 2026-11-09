@@ -1,5 +1,4 @@
 # pagoPA Payment Wallet help desk service
-
 - [Scope](#scope)
     * [Api Documentation 📖](#api-documentation-)
     * [Technology Stack](#technology-stack)
