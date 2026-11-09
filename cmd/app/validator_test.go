@@ -98,7 +98,7 @@ func TestRequestValidatorAllowsPublicServiceInfo(t *testing.T) {
 	}
 }
 
-func TestRequestValidatorDelegatesWalletAuthenticationToAPIM(t *testing.T) {
+func TestRequestValidatorLeavesAuthenticationToMiddleware(t *testing.T) {
 	validator, err := newRequestValidator("../../api-spec/api.yaml")
 	if err != nil {
 		t.Fatal(err)

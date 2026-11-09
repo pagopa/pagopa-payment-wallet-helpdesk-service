@@ -89,9 +89,12 @@ microservice-chart:
     PAYMENT_WALLET_WALLETS_COLLECTION_NAME: "payment-wallets"
     PAYMENT_WALLET_CONTRACT_DEACTIVATION_DLQ_COLLECTION_NAME: "wallet-contractId-deactivation-dlq"
     PAYMENT_WALLET_LOG_EVENTS_COLLECTION_NAME: "payment-wallets-log-events"
+    SECURITY_API_KEYS_SECURED_PATHS: "/helpdesk/"
     MONGO_ADDITIONAL_CONNECTION_PROPERTIES: "&authMechanism=SCRAM-SHA-256&retryWrites=false&minPoolSize=0&maxPoolSize=50&maxIdleTimeMS=600000&connectTimeoutMS=2000&socketTimeoutMS=10000&serverSelectionTimeoutMS=2000&waitQueueTimeoutMS=2000&heartbeatFrequencyMS=5000"
   envSecret:
     MONGO_PASSWORD: mongo-wallet-password
+    SECURITY_API_KEYS_PRIMARY: payment-wallet-helpdesk-service-primary-api-key
+    SECURITY_API_KEYS_SECONDARY: payment-wallet-helpdesk-service-secondary-api-key
   keyvault:
     name: "pagopa-d-pay-wallet-kv"
     tenantId: "7788edaf-0346-4068-9d79-c868aed15b3d"
